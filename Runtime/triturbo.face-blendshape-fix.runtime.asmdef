@@ -1,0 +1,20 @@
+{
+    "name": "triturbo.face-blendshape-fix.runtime",
+    "rootNamespace": "",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.vrchat.avatars",
+            "expression": "",
+            "define": "FBF_VRCSDK_AVATARS"
+        }
+    ],
+    "noEngineReferences": false
+}

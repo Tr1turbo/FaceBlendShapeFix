@@ -1,0 +1,99 @@
+{
+    "language.name": "简体中文",
+
+    "editor.settings": "设置",
+    "editor.smooth_width": "平滑宽度",
+    "editor.smooth_width.tooltip": "左右形态键分割过渡区域的宽度。0 = 中心硬切割。",
+    "editor.target_shapes": "形态键修复目标",
+    "editor.category": "分类",
+    "editor.category_databases": "分类数据库",
+    "editor.custom_categories": "自定义分类",
+    "editor.uncategorized": "未分类",
+    "editor.unassigned": "<未分类>",
+    "editor.unnamed": "<未命名>",
+
+    "editor.auto_fill_from_categories": "从分类自动填充",
+    "editor.auto_fill_from_categories.tooltip": "扫描目标渲染器，通过配置的分类数据库解析形态键，并自动填充目标形态。",
+
+    "editor.add_target_shape": "+ 添加目标形态",
+    "editor.add_target_shape.tooltip": "从可用的形态键中添加新的目标形态。",
+
+    "editor.collapse_all_blend_data": "折叠所有形态键混合数据",
+    "editor.collapse_all_blend_data.tooltip": "折叠目标形态部分中的所有形态键混合数据列表。",
+
+    "editor.no_target_shapes": "未配置目标形态。",
+    "editor.no_active_blendshapes": "没有活动的形态键可显示。",
+
+    "editor.delete": "删除",
+    "editor.rename": "重命名",
+    "editor.cancel": "取消",
+    "editor.ok": "确定",
+
+    "editor.dialog.delete_category.title": "删除分类",
+    "editor.dialog.delete_category.message": "确定要删除此分类中的 {0} 个目标形态吗？",
+
+    "editor.dialog.no_blendshapes.title": "没有可用的形态键",
+    "editor.dialog.no_blendshapes.message": "所有非活动的形态键已添加为目标形态，或目标渲染器上没有非活动的形态键。",
+    "editor.dialog.no_additional_blendshapes.message": "所有形态键已列在附加混合数据中，或渲染器没有形态键。",
+
+    "editor.language": "语言",
+
+    "editor.preview.enter": "预览",
+    "editor.preview.exit": "退出预览",
+
+    "editor.main_weight": "主权重",
+    "editor.main_weight.tooltip": "应用于此修复目标形态键本身的权重。",
+
+    "editor.target_shape_type": "形状类型",
+
+    "editor.use_local_definitions": "使用本地定义",
+    "editor.use_global_definitions": "使用全局定义",
+    "editor.reset_blend": "重置形态键",
+    "editor.reset_blend.tooltip": "将被减去影响以将修复目标恢复为默认外观的形态键。",
+    "editor.additive_blendshapes": "叠加形态键",
+
+    "editor.warning.blendshape_not_zero": "此形态键在渲染器中的权重不为0。",
+    "editor.warning.component_disabled": "Face BlendShape Fix 将被禁用，因为 GameObject 处于非活动状态。",
+
+    "editor.blend_data.zero_all": "全部归零",
+    "editor.blend_data.max_all": "全部最大",
+    "editor.blend_data.non_zero_to_one": "非零 → 1",
+    "editor.blend_data.apply_global": "应用全局默认",
+    "editor.blend_data.auto_calculate": "自动计算",
+    "editor.blend_data.auto_calculate.tooltip": "根据各形态键之间的相似度自动计算混合权重。",
+
+    "editor.blend_data.left": "左",
+    "editor.blend_data.right": "右",
+    "editor.blend_data.invalid": "混合数据无效：未指定形态键名称。",
+
+    "editor.blend_shape_definitions": "全局形态键定义",
+    "editor.active_blend_shape_definitions": "活动的形态键定义",
+
+    "editor.definition.left_eye_weight": "左眼权重",
+    "editor.definition.right_eye_weight": "右眼权重",
+    "editor.definition.mouth_weight": "嘴部权重",
+    "editor.protected": "受保护",
+    "editor.protected.tooltip": "受保护的形态键在重置时会被跳过，始终保持权重为0。",
+
+    "enum.shapetype.both_eyes": "双眼",
+    "enum.shapetype.left_eye": "左眼",
+    "enum.shapetype.right_eye": "右眼",
+    "enum.shapetype.mouth": "嘴部",
+    "enum.shapetype.others": "其他",
+
+    "editor.create_new_category": "+ 创建新分类",
+    "editor.dialog.create_category.title": "创建新分类",
+    "editor.dialog.create_category.message": "请输入新分类的名称：",
+
+    "editor.category_database.categories": "分类",
+    "editor.category_database.category_name": "分类名称",
+    "editor.category_database.category_color": "分类颜色",
+    "editor.category_database.priority": "优先级",
+    "editor.category_database.priority.tooltip": "当多个分类可能匹配时，优先级较高的分类会优先匹配。",
+    "editor.category_database.entries": "目标形态条目",
+    "editor.category_database.display_name": "显示名称",
+    "editor.category_database.use_global_definitions": "使用全局定义",
+    "editor.category_database.case_sensitive": "区分大小写",
+    "editor.category_database.aliases": "别名",
+    "editor.category_database.new_category": "新分类"
+}

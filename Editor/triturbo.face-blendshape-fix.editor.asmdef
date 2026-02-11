@@ -1,0 +1,25 @@
+{
+    "name": "triturbo.face-blendshape-fix.editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:7a67287bec3185b4498296c1fd905aa3",
+        "GUID:62ced99b048af7f4d8dfe4bed8373d76"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "nadena.dev.ndmf",
+            "expression": "",
+            "define": "FBF_NDMF"
+        }
+    ],
+    "noEngineReferences": false
+}

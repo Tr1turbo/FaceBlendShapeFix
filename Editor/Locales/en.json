@@ -1,0 +1,102 @@
+{
+    "language.name": "English",
+
+    "editor.settings": "Settings",
+    "editor.smooth_width": "Smooth Width",
+    "editor.smooth_width.tooltip": "Width of the transition zone for L/R blend shape splitting. 0 = hard cut at center.",
+    "editor.target_shapes": "BlendShapes Fix Target",
+    "editor.category": "Category",
+    "editor.category_databases": "Category Databases",
+    "editor.custom_categories": "Custom Categories",
+    "editor.uncategorized": "Uncategorized",
+    "editor.unassigned": "<Uncategorized>",
+    "editor.unnamed": "<Unnamed>",
+
+    "editor.auto_fill_from_categories": "Auto-Fill from Categories",
+    "editor.auto_fill_from_categories.tooltip": "Scan the target renderer, resolve blendshapes through the configured category databases, and populate TargetShapes automatically.",
+
+    "editor.add_target_shape": "+ Add Target Shape",
+    "editor.add_target_shape.tooltip": "Add a new target shape from available blendshapes.",
+
+    "editor.collapse_all_blend_data": "Collapse All Blend Data",
+    "editor.collapse_all_blend_data.tooltip": "Fold every Blend Data list in the Target Shapes section.",
+
+    "editor.no_target_shapes": "No target shapes configured.",
+    "editor.no_active_blendshapes": "No active blendshapes to display.",
+
+    "editor.delete": "Delete",
+    "editor.rename": "Rename",
+    "editor.cancel": "Cancel",
+    "editor.ok": "OK",
+
+    "editor.dialog.delete_category.title": "Delete Category",
+    "editor.dialog.delete_category.message": "Are you sure you want to delete {0} target shape(s) from this category?",
+
+    "editor.dialog.no_blendshapes.title": "No Available BlendShapes",
+    "editor.dialog.no_blendshapes.message": "All inactive blendshapes are already added as TargetShapes, or there are no inactive blendshapes on the target renderer.",
+    "editor.dialog.no_additional_blendshapes.message": "All blendshapes are already listed in Additional Blend Data, or the renderer has no blendshapes.",
+
+    "editor.language": "Language",
+
+    "editor.preview.enter": "Preview",
+    "editor.preview.exit": "Exit Preview",
+
+    "editor.main_weight": "Main Weight",
+    "editor.main_weight.tooltip": "The weight applied to this fix target blendshape itself.",
+
+    "editor.target_shape_type": "Shape Type",
+
+    "editor.use_local_definitions": "Use Local Definitions",
+    "editor.use_local_definitions.tooltip": "Use per-target blend weights instead of global BlendShape definitions.",
+    "editor.use_global_definitions": "Use Global Definitions",
+    "editor.use_global_definitions.tooltip": "Use weights from Global BlendShape Definitions for this target.",
+    
+    "editor.reset_blend": "Reset BlendShapes",
+    "editor.reset_blend.tooltip": "Blendshapes whose influence will be subtracted to restoring the fix target to its default appearance.",
+    "editor.additive_blendshapes": "Additive BlendShapes",
+
+    "editor.warning.blendshape_not_zero": "This BlendShape weight is not 0 in the renderer.",
+    "editor.warning.component_disabled": "Face BlendShape Fix will be disabled because the GameObject is inactive.",
+
+    "editor.blend_data.zero_all": "Zero All",
+    "editor.blend_data.max_all": "Max All",
+    "editor.blend_data.non_zero_to_one": "Non-Zero → 1",
+    "editor.blend_data.apply_global": "Apply Global Defaults",
+    "editor.blend_data.auto_calculate": "Auto Calculate",
+    "editor.blend_data.auto_calculate.tooltip": "Automatically calculate blend weights based on similarity between each blendshape.",
+
+    "editor.blend_data.left": "Left",
+    "editor.blend_data.right": "Right",
+    "editor.blend_data.invalid": "Blend Data is invalid: no blendshape name specified.",
+
+    "editor.blend_shape_definitions": "Global BlendShape Definitions",
+    "editor.active_blend_shape_definitions": "Active Blend Shape Definitions",
+    
+    "editor.definition.left_eye_weight": "Left Eye Weight",
+    "editor.definition.right_eye_weight": "Right Eye Weight",
+    "editor.definition.mouth_weight": "Mouth Weight",
+    "editor.protected": "Protected",
+    "editor.protected.tooltip": "Protected blendshapes are skipped during Reset BlendShapes and always remain at weight 0.",
+
+    "enum.shapetype.both_eyes": "Both Eyes",
+    "enum.shapetype.left_eye": "Left Eye",
+    "enum.shapetype.right_eye": "Right Eye",
+    "enum.shapetype.mouth": "Mouth",
+    "enum.shapetype.others": "Others",
+
+    "editor.create_new_category": "+ Create New Category",
+    "editor.dialog.create_category.title": "Create New Category",
+    "editor.dialog.create_category.message": "Enter a name for the new category:",
+
+    "editor.category_database.categories": "Categories",
+    "editor.category_database.category_name": "Category Name",
+    "editor.category_database.category_color": "Category Color",
+    "editor.category_database.priority": "Priority",
+    "editor.category_database.priority.tooltip": "Higher priority categories are matched first when multiple categories could match.",
+    "editor.category_database.entries": "Target Shape Entries",
+    "editor.category_database.display_name": "Display Name",
+    "editor.category_database.use_global_definitions": "Use Global Definitions",
+    "editor.category_database.case_sensitive": "Case Sensitive",
+    "editor.category_database.aliases": "Aliases",
+    "editor.category_database.new_category": "New Category"
+}

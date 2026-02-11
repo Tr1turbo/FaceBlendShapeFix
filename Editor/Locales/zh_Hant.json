@@ -1,0 +1,99 @@
+{
+    "language.name": "繁體中文",
+
+    "editor.settings": "設定",
+    "editor.smooth_width": "平滑寬度",
+    "editor.smooth_width.tooltip": "左右型態鍵分割過渡區域的寬度。0 = 中心硬切割。",
+    "editor.target_shapes": "型態鍵修復目標",
+    "editor.category": "分類",
+    "editor.category_databases": "分類資料庫",
+    "editor.custom_categories": "自訂分類",
+    "editor.uncategorized": "未分類",
+    "editor.unassigned": "<未分類>",
+    "editor.unnamed": "<未命名>",
+
+    "editor.auto_fill_from_categories": "從分類自動填入",
+    "editor.auto_fill_from_categories.tooltip": "掃描目標渲染器，透過設定的分類資料庫解析型態鍵，並自動填入修復目標。",
+
+    "editor.add_target_shape": "+ 新增修復目標",
+    "editor.add_target_shape.tooltip": "從可用的型態鍵中新增修復目標。",
+
+    "editor.collapse_all_blend_data": "摺疊所有型態鍵混合資料",
+    "editor.collapse_all_blend_data.tooltip": "摺疊修復目標區段中的所有型態鍵混合資料清單。",
+
+    "editor.no_target_shapes": "未設定修復目標。",
+    "editor.no_active_blendshapes": "沒有作用中的型態鍵可顯示。",
+
+    "editor.delete": "刪除",
+    "editor.rename": "重新命名",
+    "editor.cancel": "取消",
+    "editor.ok": "確定",
+
+    "editor.dialog.delete_category.title": "刪除分類",
+    "editor.dialog.delete_category.message": "確定要刪除此分類中的 {0} 個修復目標嗎？",
+
+    "editor.dialog.no_blendshapes.title": "沒有可用的型態鍵",
+    "editor.dialog.no_blendshapes.message": "所有非作用中的型態鍵已新增為修復目標，或目標渲染器上沒有非作用中的型態鍵。",
+    "editor.dialog.no_additional_blendshapes.message": "所有型態鍵已列在附加混合資料中，或渲染器沒有型態鍵。",
+
+    "editor.language": "語言",
+
+    "editor.preview.enter": "預覽",
+    "editor.preview.exit": "結束預覽",
+
+    "editor.main_weight": "主權重",
+    "editor.main_weight.tooltip": "套用於此修復目標型態鍵本身的權重。",
+
+    "editor.target_shape_type": "形狀類型",
+
+    "editor.use_local_definitions": "使用區域定義",
+    "editor.use_global_definitions": "使用全域定義",
+    "editor.reset_blend": "重置型態鍵",
+    "editor.reset_blend.tooltip": "將被減去影響以將修復目標恢復為預設外觀的型態鍵。",
+    "editor.additive_blendshapes": "疊加型態鍵",
+
+    "editor.warning.blendshape_not_zero": "此型態鍵在渲染器中的權重不為0。",
+    "editor.warning.component_disabled": "Face BlendShape Fix 將被停用，因為 GameObject 處於非作用中狀態。",
+
+    "editor.blend_data.zero_all": "全部歸零",
+    "editor.blend_data.max_all": "全部最大",
+    "editor.blend_data.non_zero_to_one": "非零 → 1",
+    "editor.blend_data.apply_global": "套用全域預設",
+    "editor.blend_data.auto_calculate": "自動計算",
+    "editor.blend_data.auto_calculate.tooltip": "根據各型態鍵之間的相似度自動計算混合權重。",
+
+    "editor.blend_data.left": "左",
+    "editor.blend_data.right": "右",
+    "editor.blend_data.invalid": "混合資料無效：未指定型態鍵名稱。",
+
+    "editor.blend_shape_definitions": "全域型態鍵定義",
+    "editor.active_blend_shape_definitions": "作用中的型態鍵定義",
+
+    "editor.definition.left_eye_weight": "左眼權重",
+    "editor.definition.right_eye_weight": "右眼權重",
+    "editor.definition.mouth_weight": "嘴部權重",
+    "editor.protected": "受保護",
+    "editor.protected.tooltip": "受保護的型態鍵在重置時會被跳過，始終保持權重為0。",
+
+    "enum.shapetype.both_eyes": "雙眼",
+    "enum.shapetype.left_eye": "左眼",
+    "enum.shapetype.right_eye": "右眼",
+    "enum.shapetype.mouth": "嘴部",
+    "enum.shapetype.others": "其他",
+
+    "editor.create_new_category": "+ 建立新分類",
+    "editor.dialog.create_category.title": "建立新分類",
+    "editor.dialog.create_category.message": "請輸入新分類的名稱：",
+
+    "editor.category_database.categories": "分類",
+    "editor.category_database.category_name": "分類名稱",
+    "editor.category_database.category_color": "分類顏色",
+    "editor.category_database.priority": "優先順序",
+    "editor.category_database.priority.tooltip": "當多個分類可能匹配時，優先順序較高的分類會優先匹配。",
+    "editor.category_database.entries": "目標型態條目",
+    "editor.category_database.display_name": "顯示名稱",
+    "editor.category_database.use_global_definitions": "使用全域定義",
+    "editor.category_database.case_sensitive": "區分大小寫",
+    "editor.category_database.aliases": "別名",
+    "editor.category_database.new_category": "新分類"
+}

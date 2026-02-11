@@ -1,0 +1,17 @@
+{
+  "name": "com.triturbo.face-blendshape-fix",
+  "displayName": "Face BlendShape Fix",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "description": "Bakes reverse corrections into face BlendShapes after editing BlendShape weights.",
+  "author": {
+    "name": "Triturbo",
+    "email": "Triturbo000@gmail.com",
+    "url": "https://github.com/Tr1turbo"
+  },
+  "url": "",
+  "repo": "",
+  "vpmDependencies": {
+    "nadena.dev.ndmf": ">=1.10.0 <2.0.0-a"
+  }
+}

@@ -1,0 +1,99 @@
+{
+    "language.name": "日本語",
+
+    "editor.settings": "設定",
+    "editor.smooth_width": "スムース幅",
+    "editor.smooth_width.tooltip": "左右ブレンドシェイプ分割のトランジションゾーンの幅。0 = 中央でハードカット。",
+    "editor.target_shapes": "シェイプキー修正対象",
+    "editor.category": "カテゴリ",
+    "editor.category_databases": "カテゴリデータベース",
+    "editor.custom_categories": "カスタムカテゴリ",
+    "editor.uncategorized": "未分類",
+    "editor.unassigned": "<未分類>",
+    "editor.unnamed": "<名前なし>",
+
+    "editor.auto_fill_from_categories": "カテゴリから自動入力",
+    "editor.auto_fill_from_categories.tooltip": "ターゲットレンダラーをスキャンし、設定されたカテゴリデータベースを通じてシェイプキーを解決し、シェイプキー修正対象を自動的に入力します。",
+
+    "editor.add_target_shape": "+ シェイプキー修正対象を追加",
+    "editor.add_target_shape.tooltip": "利用可能なシェイプキーから新しいシェイプキー修正対象を追加します。",
+
+    "editor.collapse_all_blend_data": "すべてのブレンドデータを折り畳む",
+    "editor.collapse_all_blend_data.tooltip": "シェイプキー修正対象セクションのすべてのブレンドデータリストを折り畳みます。",
+
+    "editor.no_target_shapes": "シェイプキー修正対象が設定されていません。",
+    "editor.no_active_blendshapes": "表示するアクティブなシェイプキーがありません。",
+
+    "editor.delete": "削除",
+    "editor.rename": "名前を変更",
+    "editor.cancel": "キャンセル",
+    "editor.ok": "OK",
+
+    "editor.dialog.delete_category.title": "カテゴリを削除",
+    "editor.dialog.delete_category.message": "このカテゴリから{0}個のシェイプキー修正対象を削除してもよろしいですか？",
+
+    "editor.dialog.no_blendshapes.title": "利用可能なシェイプキーがありません",
+    "editor.dialog.no_blendshapes.message": "すべての非アクティブなシェイプキーは既にシェイプキー修正対象として追加されているか、ターゲットレンダラーに非アクティブなシェイプキーがありません。",
+    "editor.dialog.no_additional_blendshapes.message": "すべてのシェイプキーは既に追加ブレンドデータにリストされているか、レンダラーにシェイプキーがありません。",
+
+    "editor.language": "言語",
+
+    "editor.preview.enter": "プレビュー",
+    "editor.preview.exit": "プレビュー終了",
+
+    "editor.main_weight": "メインウェイト",
+    "editor.main_weight.tooltip": "この修正対象シェイプキー自体に適用されるウェイト。",
+
+    "editor.target_shape_type": "シェイプタイプ",
+
+    "editor.use_local_definitions": "ローカル定義を使用",
+    "editor.use_global_definitions": "グローバル定義を使用",
+    "editor.reset_blend": "シェイプキーをリセット",
+    "editor.reset_blend.tooltip": "修正対象をデフォルトの外観に戻すために影響が減算されるシェイプキー。",
+    "editor.additive_blendshapes": "加算シェイプキー",
+
+    "editor.warning.blendshape_not_zero": "このシェイプキーのウェイトはレンダラーで0ではありません。",
+    "editor.warning.component_disabled": "GameObjectが無効なため、Face BlendShape Fixは無効になります。",
+
+    "editor.blend_data.zero_all": "すべてゼロ",
+    "editor.blend_data.max_all": "すべて最大",
+    "editor.blend_data.non_zero_to_one": "非ゼロ → 1",
+    "editor.blend_data.apply_global": "グローバル設定を適用",
+    "editor.blend_data.auto_calculate": "自動計算",
+    "editor.blend_data.auto_calculate.tooltip": "各シェイプキー間の類似性に基づいてブレンドウェイトを自動計算します。",
+
+    "editor.blend_data.left": "左",
+    "editor.blend_data.right": "右",
+    "editor.blend_data.invalid": "ブレンドデータが無効です：シェイプキー名が指定されていません。",
+
+    "editor.blend_shape_definitions": "グローバルシェイプキー定義",
+    "editor.active_blend_shape_definitions": "アクティブなシェイプキー定義",
+
+    "editor.definition.left_eye_weight": "左目ウェイト",
+    "editor.definition.right_eye_weight": "右目ウェイト",
+    "editor.definition.mouth_weight": "口ウェイト",
+    "editor.protected": "保護",
+    "editor.protected.tooltip": "保護されたシェイプキーはリセット時にスキップされ、常にウェイト0のままになります。",
+
+    "enum.shapetype.both_eyes": "両目",
+    "enum.shapetype.left_eye": "左目",
+    "enum.shapetype.right_eye": "右目",
+    "enum.shapetype.mouth": "口",
+    "enum.shapetype.others": "その他",
+
+    "editor.create_new_category": "+ 新しいカテゴリを作成",
+    "editor.dialog.create_category.title": "新しいカテゴリを作成",
+    "editor.dialog.create_category.message": "新しいカテゴリの名前を入力してください：",
+
+    "editor.category_database.categories": "カテゴリ",
+    "editor.category_database.category_name": "カテゴリ名",
+    "editor.category_database.category_color": "カテゴリ色",
+    "editor.category_database.priority": "優先度",
+    "editor.category_database.priority.tooltip": "複数のカテゴリがマッチする可能性がある場合、優先度が高いカテゴリが最初にマッチします。",
+    "editor.category_database.entries": "ターゲットシェイプエントリ",
+    "editor.category_database.display_name": "表示名",
+    "editor.category_database.use_global_definitions": "グローバル定義を使用",
+    "editor.category_database.case_sensitive": "大文字小文字を区別",
+    "editor.category_database.aliases": "エイリアス",
+    "editor.category_database.new_category": "新しいカテゴリ"
+}

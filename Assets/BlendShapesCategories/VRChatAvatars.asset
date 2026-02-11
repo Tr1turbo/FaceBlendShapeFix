@@ -1,0 +1,327 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 14c1e2561fdf6fe4e808af944221de62, type: 3}
+  m_Name: VRChatAvatars
+  m_EditorClassIdentifier: 
+  m_Categories:
+  - m_CategoryName: VRChat
+    m_Priority: 0
+    m_TargetShapeEntries:
+    - m_DisplayName: vrc.blink
+      m_TargetShapeType: 0
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.blink (3.0)
+    - m_DisplayName: vrc.v_aa
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.aa
+    - m_DisplayName: vrc.v_ch
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.ch
+    - m_DisplayName: vrc.v_dd
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.dd
+    - m_DisplayName: vrc.v_e
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.e
+    - m_DisplayName: vrc.v_ff
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.ff
+    - m_DisplayName: vrc.v_ih
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.ih
+    - m_DisplayName: vrc.v_kk
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.kk
+    - m_DisplayName: vrc.v_nn
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.nn
+    - m_DisplayName: vrc.v_oh
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.oh
+    - m_DisplayName: vrc.v_ou
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.ou
+    - m_DisplayName: vrc.v_pp
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.pp
+    - m_DisplayName: vrc.v_rr
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.rr
+    - m_DisplayName: vrc.v_sil
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.sil
+    - m_DisplayName: vrc.v_ss
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.ss
+    - m_DisplayName: vrc.v_th
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - vrc.v.th
+  - m_CategoryName: MMD
+    m_Priority: 0
+    m_TargetShapeEntries:
+    - m_DisplayName: "\u307E\u3070\u305F\u304D"
+      m_TargetShapeType: 0
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Blink
+    - m_DisplayName: "\u7B11\u3044"
+      m_TargetShapeType: 0
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Smile
+    - m_DisplayName: "\u30A6\u30A3\u30F3\u30AF"
+      m_TargetShapeType: 1
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Wink
+    - m_DisplayName: "\u30A6\u30A3\u30F3\u30AF\u53F3"
+      m_TargetShapeType: 2
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Wink-a
+    - m_DisplayName: "\u30A6\u30A3\u30F3\u30AF\uFF12"
+      m_TargetShapeType: 1
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Wink-b
+    - m_DisplayName: "\u30A6\u30A3\u30F3\u30AF\uFF12\u53F3"
+      m_TargetShapeType: 2
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - "\uFF73\uFF68\uFF9D\uFF78\uFF12\u53F3"
+      - Wink-c
+    - m_DisplayName: "\u306A\u3054\u307F"
+      m_TargetShapeType: 0
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Howawa
+    - m_DisplayName: "\u306F\u3045"
+      m_TargetShapeType: 0
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - '> <'
+    - m_DisplayName: "\u3073\u3063\u304F\u308A"
+      m_TargetShapeType: 4
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Ha!!!
+    - m_DisplayName: "\u3058\u3068\u76EE"
+      m_TargetShapeType: 0
+      m_UseGlobalDefinitions: 0
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Jito-eye
+    - m_DisplayName: "\uFF77\uFF98\uFF6F"
+      m_TargetShapeType: 4
+      m_UseGlobalDefinitions: 0
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Kiri-eye
+    - m_DisplayName: "\u306A\u306C\uFF01"
+      m_TargetShapeType: 4
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases: []
+    - m_DisplayName: "\u767D\u76EE"
+      m_TargetShapeType: 4
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - 
+    - m_DisplayName: "\u306F\u3061\u3085\u76EE"
+      m_TargetShapeType: 0
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - O O
+    - m_DisplayName: "\u3042"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - a
+    - m_DisplayName: "\u3044"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - i
+    - m_DisplayName: "\u3046"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - u
+    - m_DisplayName: "\u3048"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - e
+    - m_DisplayName: "\u304A"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - o
+    - m_DisplayName: "\u3042\uFF12"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - a 2
+    - m_DisplayName: "\u3093"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - n
+    - m_DisplayName: "\u25B2"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Mouse_1
+    - m_DisplayName: "\u2227"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Mouse_2
+    - m_DisplayName: "\u30EF"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Wa
+    - m_DisplayName: "\u25A1"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - 
+    - m_DisplayName: "\u03C9"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Omega
+    - m_DisplayName: "\u03C9\u25A1"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - 
+    - m_DisplayName: "\u3048\u30FC"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - 
+    - m_DisplayName: "\u306F\u3093\u3063\uFF01"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - 
+    - m_DisplayName: "\u306B\u3084\u308A"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Niyari
+    - m_DisplayName: "\u306B\u3084\u308A\uFF12"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Niyari2
+    - m_DisplayName: "\u306B\u3063\u3053\u308A"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Smile
+    - m_DisplayName: "\u307A\u308D\u3063"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - Pero
+    - m_DisplayName: "\u3066\u3078\u307A\u308D"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - 
+    - m_DisplayName: "\u3066\u3078\u307A\u308D\uFF12"
+      m_TargetShapeType: 3
+      m_UseGlobalDefinitions: 1
+      m_CaseSensitive: 0
+      m_Aliases:
+      - 
