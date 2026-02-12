@@ -1,7 +1,7 @@
 {
   "name": "com.triturbo.face-blendshape-fix",
   "displayName": "Face BlendShape Fix",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "unity": "2022.3",
   "description": "Bakes reverse corrections into face BlendShapes after editing BlendShape weights.",
   "author": {
