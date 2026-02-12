@@ -25,6 +25,18 @@ When avatar faces are edited (for example, closing eyes or opening the mouth), e
 - NDMF
 - VRChat SDK3 Avatars
 
+## Installation
+
+### ALCOM / VCC
+1. Add the VPM repository:
+  https://tr1turbo.github.io/vpm-listing/
+2. Install **Face BlendShape Fix** from your package list.
+
+### Manual download
+1. Download the `.unitypackage` latest release:
+   https://github.com/Tr1turbo/FaceBlendShapeFix/releases/latest
+2. Import the unitypackage into your Unity Project
+
 ## Usage
 
 1. Add **FaceBlendShapeFixComponent** to your avatar.
