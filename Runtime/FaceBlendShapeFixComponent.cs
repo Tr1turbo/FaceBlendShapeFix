@@ -121,7 +121,5 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
     {
         public bool m_EnableBlendDataScroll = true;
         public float m_BlendDataScrollHeight = 240f;
-        public bool m_UseBlendDataReorderableList = false;
-        public bool m_EnableDrawProfiling = false;
     }
 }
