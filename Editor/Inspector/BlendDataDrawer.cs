@@ -8,6 +8,9 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
     [CustomPropertyDrawer(typeof(BlendData))]
     public class BlendDataDrawer : PropertyDrawer
     {
+        private static GUIContent UnlinkedLabel =>EditorGUIUtility.IconContent("UnLinked");
+        private static GUIContent LinkedLabel => EditorGUIUtility.IconContent("Linked");
+
         private static string LeftLabel => Localization.Get("editor.blend_data.left", "L");
         private static string RightLabel => Localization.Get("editor.blend_data.right", "R");
 
@@ -15,7 +18,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         private struct LayoutMetrics
         {
             private const float Padding = 3f;
-            private const float ButtonWidth = 32f;
+            private const float ButtonWidth = 16f;
             private const float ContentIndent = 8f;
             private const float SideLabelWidth = 36f;
             private const float SideLabelGap = 10f;
@@ -131,7 +134,15 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 m_Weight = value.m_Weight
             };
             return DrawInternal(position, metrics, displayName, newValue);
-        }
+        } 
+
+        internal static void DrawProtected(Rect position, GUIContent button, GUIContent displayName)
+        {
+            var metrics = new LayoutMetrics(position);
+            GUI.Label(metrics.buttonRect, button, EditorStyles.iconButton);
+            GUI.Label(metrics.labelRect, displayName, EditorStyles.largeLabel);
+            EditorGUI.Slider(metrics.sliderRect, 0, 0f, 1f);
+        } 
 
         private static BlendData DrawInternal(Rect position, LayoutMetrics metrics, string displayName, BlendData value)
         {
@@ -149,7 +160,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         private static BlendData DrawSplitMode(Rect position, LayoutMetrics metrics, string displayName, BlendData value)
         {
             // Line 1
-            if (GUI.Button(metrics.buttonRect, "◈", EditorStyles.miniButton))
+            if (GUI.Button(metrics.buttonRect, UnlinkedLabel, EditorStyles.iconButton))
             {
                 value.m_SplitLeftRight = false;
                 
@@ -177,7 +188,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
         private static BlendData DrawUnifiedMode(Rect position, LayoutMetrics metrics, string displayName, BlendData value)
         {
-            if (GUI.Button(metrics.buttonRect, "⇄", EditorStyles.miniButton))
+            if (GUI.Button(metrics.buttonRect, LinkedLabel, EditorStyles.iconButton))
             {
                 value.m_SplitLeftRight = true;
             }

@@ -77,6 +77,8 @@
     "editor.definition.mouth_weight": "口ウェイト",
     "editor.protected": "保護",
     "editor.protected.tooltip": "保護されたシェイプキーはリセット時にスキップされ、常にウェイト0のままになります。",
+    "editor.blendshape_cannot_reset_itself": "このシェイプキーは自身をリセットできません。",
+    "editor.blendshape_is_protected": "このシェイプキーは保護されています。",
 
     "enum.shapetype.both_eyes": "両目",
     "enum.shapetype.left_eye": "左目",

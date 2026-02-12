@@ -80,6 +80,8 @@
     "editor.definition.mouth_weight": "Mouth Weight",
     "editor.protected": "Protected",
     "editor.protected.tooltip": "Protected blendshapes are skipped during Reset BlendShapes and always remain at weight 0.",
+    "editor.blendshape_cannot_reset_itself": "This BlendShape cannot reset itself.",
+    "editor.blendshape_is_protected": "This BlendShape is protected.",
 
     "enum.shapetype.both_eyes": "Both Eyes",
     "enum.shapetype.left_eye": "Left Eye",

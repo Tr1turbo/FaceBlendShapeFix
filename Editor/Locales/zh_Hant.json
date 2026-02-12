@@ -77,6 +77,8 @@
     "editor.definition.mouth_weight": "嘴部權重",
     "editor.protected": "受保護",
     "editor.protected.tooltip": "受保護的型態鍵在重置時會被跳過，始終保持權重為0。",
+    "editor.blendshape_cannot_reset_itself": "此型態鍵無法重置自身。",
+    "editor.blendshape_is_protected": "此型態鍵受保護。",
 
     "enum.shapetype.both_eyes": "雙眼",
     "enum.shapetype.left_eye": "左眼",

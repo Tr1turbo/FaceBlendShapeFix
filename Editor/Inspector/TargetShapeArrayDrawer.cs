@@ -1028,29 +1028,30 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     bool isProtected = data.IsProtected(definitions);
                     bool isSelf = _component.m_TargetShapes[targetIndex].m_TargetShapeName == data.m_TargetShapeName;
                     
-                    var height = BlendDataDrawer.GetHeight(data);
-                    var rect = EditorGUILayout.GetControlRect(true, height);
-                    
-                    
                     //EditorGUI.BeginProperty(rect, GUIContent.none, blendDataArray.GetArrayElementAtIndex(index));
 
-                    if (isProtected || isSelf)
+                    if (isSelf)
                     {
+                        var rect = EditorGUILayout.GetControlRect(true, EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing);
+                        var tooltip = L.Get("editor.blendshape_cannot_reset_itself");
                         using (new EditorGUI.DisabledScope(true))
                         {
-                            BlendDataDrawer.Draw(rect,
-                                new BlendData()
-                                {
-                                    m_TargetShapeName = data.m_TargetShapeName,
-                                    m_Weight = 0,
-                                    m_LeftWeight = 0,
-                                    m_RightWeight = 0,
-                                    m_SplitLeftRight = false
-                                });
+                            BlendDataDrawer.DrawProtected(rect, EditorGUIUtility.IconContent("Dependency"), new GUIContent(data.m_TargetShapeName, tooltip));
+                        }
+                    }
+                    else if (isProtected)
+                    {
+                        var rect = EditorGUILayout.GetControlRect(true, EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing);
+                        string tooltip = L.Get("editor.blendshape_is_protected");
+                        using (new EditorGUI.DisabledScope(true))
+                        {
+                            BlendDataDrawer.DrawProtected(rect,  EditorGUIUtility.IconContent("Locked"), new GUIContent(data.m_TargetShapeName, tooltip));
                         }
                     }
                     else
                     {
+                        var height = BlendDataDrawer.GetHeight(data);
+                        var rect = EditorGUILayout.GetControlRect(true, height);
                         EditorGUI.BeginChangeCheck();
                         var newValue = BlendDataDrawer.Draw(rect, _component.m_TargetShapes[targetIndex].m_BlendData[index]);
                         if (EditorGUI.EndChangeCheck())
