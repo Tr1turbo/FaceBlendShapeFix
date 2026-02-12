@@ -54,6 +54,9 @@
 
     "editor.warning.blendshape_not_zero": "このシェイプキーのウェイトはレンダラーで0ではありません。",
     "editor.warning.component_disabled": "GameObjectが無効なため、Face BlendShape Fixは無効になります。",
+    "editor.warning.ndmf_missing": "NDMFがインストールされていません。Face BlendShape Fixは無効です。NDMFのリストを追加して、NDMFをインポートしてください。",
+    "editor.button.add_ndmf_listing": "NDMFリストを追加",
+    "editor.button.open_ndmf_repo": "NDMFリポジトリを開く",
 
     "editor.blend_data.zero_all": "すべてゼロ",
     "editor.blend_data.max_all": "すべて最大",

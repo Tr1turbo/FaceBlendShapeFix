@@ -12,6 +12,6 @@
   "url": "",
   "repo": "",
   "vpmDependencies": {
-    "nadena.dev.ndmf": ">=1.10.0 <2.0.0-a"
+    "nadena.dev.ndmf": ">=1.6.0"
   }
 }

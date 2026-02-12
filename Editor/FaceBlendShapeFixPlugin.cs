@@ -6,7 +6,10 @@ using UnityEngine;
 [assembly: ExportsPlugin(typeof(FaceBlendShapeFixPlugin))]
 namespace Triturbo.FaceBlendShapeFix
 {
+
+    #if FBF_NDMF_1_8_0
     [RunsOnAllPlatforms]
+    #endif
     public class FaceBlendShapeFixPlugin : Plugin<FaceBlendShapeFixPlugin>
     {
         protected override void Configure()

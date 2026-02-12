@@ -48,6 +48,21 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         private static GUIContent AutoFillButtonContent => L.G("editor.auto_fill_from_categories");
         private static GUIContent AddTargetShapeButtonContent => L.G("editor.add_target_shape");
         private static GUIContent CollapseAllBlendDataContent => L.G("editor.collapse_all_blend_data");
+        private static GUIContent AddNdmfListingButtonContent => L.G("editor.button.add_ndmf_listing");
+        private static GUIContent OpenNdmfRepoButtonContent
+        {
+            get
+            {
+                GUIContent content = L.G("editor.button.open_ndmf_repo");
+                Texture icon = EditorGUIUtility.IconContent("d_UnityEditor.VersionControl").image;
+                if (icon != null)
+                {
+                    content.image = icon;
+                }
+                return content;
+            }
+        }
+
 
         private BlendShapeActivationObserver _blendShapeActivationObserver;
 
@@ -83,14 +98,10 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             component = target as FaceBlendShapeFixComponent;
             Debug.Assert(component != null);
             
-            
-
             _blendShapeActivationObserver = new BlendShapeActivationObserver(component.TargetRenderer);
             _targetShapeArrayDrawer = new TargetShapeArrayDrawer(component, targetShapesProp, _blendShapeActivationObserver);
             _targetShapeArrayDrawer.DrawCategorySelector = DrawCategorySelector;
             
-            
-            //targetShapeDrawer ??= new TargetShapeDrawer(this, targetShapesProp);
 
             _blendShapeActivationObserver.OnActiveBlendShapesChanged += (change) =>
             {
@@ -138,6 +149,22 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             {
                 EditorGUILayout.HelpBox(L.Get("editor.warning.component_disabled"), MessageType.Warning);
             }
+
+        #if !FBF_NDMF
+            EditorGUILayout.HelpBox(L.Get("editor.warning.ndmf_missing"), MessageType.Error);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button(OpenNdmfRepoButtonContent, EditorStyles.miniButton))
+                {
+                    Application.OpenURL("https://github.com/bdunderscore/ndmf");
+                }
+                if (GUILayout.Button(AddNdmfListingButtonContent, EditorStyles.miniButton))
+                {
+                    Application.OpenURL("vcc://vpm/addRepo?url=https://vpm.nadena.dev/vpm.json");
+                }
+            }
+            EditorGUILayout.Separator();
+        #endif
 
             L.DrawLanguagePopup(L.Get("editor.language"));
             

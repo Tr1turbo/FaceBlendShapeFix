@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-#if FBF_VRCSDK_AVATARS
+#if FBF_VRCSDK_BASE
 using VRC.SDKBase;
 #endif
 
@@ -9,7 +9,7 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
 {
     [AddComponentMenu("Triturbo/Face BlendShape Fix")]
     public class FaceBlendShapeFixComponent : MonoBehaviour
-#if FBF_VRCSDK_AVATARS
+#if FBF_VRCSDK_BASE
     , IEditorOnly
 #endif
     {

@@ -57,6 +57,9 @@
 
     "editor.warning.blendshape_not_zero": "This BlendShape weight is not 0 in the renderer.",
     "editor.warning.component_disabled": "Face BlendShape Fix will be disabled because the GameObject is inactive.",
+    "editor.warning.ndmf_missing": "NDMF is not installed. Face BlendShape Fix is disabled. Add the NDMF listing and import NDMF.",
+    "editor.button.add_ndmf_listing": "Add NDMF Listing",
+    "editor.button.open_ndmf_repo": "Open NDMF Repo",
 
     "editor.blend_data.zero_all": "Zero All",
     "editor.blend_data.max_all": "Max All",

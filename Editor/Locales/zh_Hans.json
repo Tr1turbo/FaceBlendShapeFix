@@ -54,6 +54,9 @@
 
     "editor.warning.blendshape_not_zero": "此形态键在渲染器中的权重不为0。",
     "editor.warning.component_disabled": "Face BlendShape Fix 将被禁用，因为 GameObject 处于非活动状态。",
+    "editor.warning.ndmf_missing": "未安装 NDMF。Face BlendShape Fix 已禁用。请添加 NDMF 列表并导入 NDMF。",
+    "editor.button.add_ndmf_listing": "添加 NDMF 列表",
+    "editor.button.open_ndmf_repo": "打开 NDMF 仓库",
 
     "editor.blend_data.zero_all": "全部归零",
     "editor.blend_data.max_all": "全部最大",

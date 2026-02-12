@@ -54,6 +54,9 @@
 
     "editor.warning.blendshape_not_zero": "此型態鍵在渲染器中的權重不為0。",
     "editor.warning.component_disabled": "Face BlendShape Fix 將被停用，因為 GameObject 處於非作用中狀態。",
+    "editor.warning.ndmf_missing": "未安裝 NDMF。Face BlendShape Fix 已停用。請新增 NDMF 清單並匯入 NDMF。",
+    "editor.button.add_ndmf_listing": "新增 NDMF 清單",
+    "editor.button.open_ndmf_repo": "開啟 NDMF 儲存庫",
 
     "editor.blend_data.zero_all": "全部歸零",
     "editor.blend_data.max_all": "全部最大",
