@@ -19,7 +19,7 @@ namespace Triturbo.FaceBlendShapeFix
 
         private static readonly TogglablePreviewNode EnableNode = TogglablePreviewNode.Create(
             () => "Face BlendShape Fix Preview",
-            "triturbo.shapeblend/preview",
+            "triturbo.face-blendshape-fix/preview",
             true
         );
 
@@ -183,7 +183,6 @@ namespace Triturbo.FaceBlendShapeFix
             }
 
             Dictionary<int, float> targetWeights;
-
             if (_component.TryGetPreviewRequest(out var request) && request.Target != null)
             {
                 targetWeights = CalculateProxyWeights(_sourceRenderer, proxySmr, request.Target.m_TargetShapeName);
@@ -199,7 +198,6 @@ namespace Triturbo.FaceBlendShapeFix
                 proxySmr.SetBlendShapeWeight(weight.Key, weight.Value);
             }
 
-            SceneView.RepaintAll();
         }
 
         #endregion
@@ -233,11 +231,11 @@ namespace Triturbo.FaceBlendShapeFix
                     
                 if (!weights.TryAdd(rightIndex, reducedRight))
                 {
-                    weights[rightIndex] = reducedRight;
+                    weights[rightIndex] += reducedRight;
                 }
                 if (!weights.TryAdd(leftIndex, reducedLeft))
                 {
-                    weights[leftIndex] = reducedLeft;
+                    weights[leftIndex] += reducedLeft;
                 }
                 
             }

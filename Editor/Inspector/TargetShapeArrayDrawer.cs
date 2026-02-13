@@ -265,10 +265,12 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 if (previewIndex != targetIndex)
                 {
                     _component.BeginPreview(targetIndex, newPreviewWeight);
+                    InternalEditorUtility.RepaintAllViews();
                 }
                 else
                 {
                     _component.UpdateWeight(newPreviewWeight);
+                    InternalEditorUtility.RepaintAllViews();
                 }
             }
 
@@ -293,10 +295,13 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     if (isCurrentPreview)
                     {
                         _component.EndPreview();
+                        InternalEditorUtility.RepaintAllViews();
+
                     }
                     else if (isPreviewEnabled)
                     {
                        _component.BeginPreview(targetIndex, 100f);
+                       InternalEditorUtility.RepaintAllViews();
                     }
                 }
             }
