@@ -12,6 +12,7 @@ namespace Triturbo.FaceBlendShapeFix
     #endif
     public class FaceBlendShapeFixPlugin : Plugin<FaceBlendShapeFixPlugin>
     {
+        public override string DisplayName => "Face BlendShape Fix";
         protected override void Configure()
         {
             InPhase(BuildPhase.Generating)
