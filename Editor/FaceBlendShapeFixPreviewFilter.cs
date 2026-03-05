@@ -66,7 +66,6 @@ namespace Triturbo.FaceBlendShapeFix
         public Task<IRenderFilterNode> Instantiate(RenderGroup group, IEnumerable<(Renderer, Renderer)> proxyPairs,
             ComputeContext context)
         {
-            Debug.Log("ShapeBlendPreviewFilter Instantiate called");
             var component = group.GetData<FaceBlendShapeFixComponent>();
             var source = component?.TargetRenderer;
 
@@ -74,8 +73,6 @@ namespace Triturbo.FaceBlendShapeFix
             {
                 return Task.FromResult<IRenderFilterNode>(null);
             }
-
-            
 
             var node = new ShapeBlendPreviewNode(component, source);
             return node.Refresh(proxyPairs, context, RenderAspects.Everything);
@@ -131,6 +128,10 @@ namespace Triturbo.FaceBlendShapeFix
         public Task<IRenderFilterNode> Refresh(IEnumerable<(Renderer, Renderer)> proxyPairs, ComputeContext context,
             RenderAspects updatedAspects)
         {
+            if (_component == null || _sourceRenderer == null)
+            {
+                return Task.FromResult<IRenderFilterNode>(this);
+            }
 
             bool needsRebuild = false;
 
@@ -183,7 +184,7 @@ namespace Triturbo.FaceBlendShapeFix
             }
 
             Dictionary<int, float> targetWeights;
-            if (_component.TryGetPreviewRequest(out var request) && request.Target != null)
+            if (_component != null && _component.TryGetPreviewRequest(out var request) && request.Target != null)
             {
                 targetWeights = CalculateProxyWeights(_sourceRenderer, proxySmr, request.Target.m_TargetShapeName);
                 UpdateWeights(targetWeights, proxySmr, request.Target, request.Weight);
@@ -306,20 +307,38 @@ namespace Triturbo.FaceBlendShapeFix
 
             _activeTargets.Clear();
 
+            if (_component == null)
+            {
+                return weights;
+            }
+
             var mesh = source.sharedMesh;
             if (mesh == null)
             {
                 return weights;
             }
+
+            var proxyMesh = proxy.sharedMesh;
+            if (proxyMesh == null)
+            {
+                return weights;
+            }
             
             int count = mesh.blendShapeCount;
-            if (proxy.sharedMesh.blendShapeCount > count)
+            if (proxyMesh.blendShapeCount > count)
             {
-                for (int i = count; i < proxy.sharedMesh.blendShapeCount; i++)
+                for (int i = count; i < proxyMesh.blendShapeCount; i++)
                 {
                     weights.Add(i, 0f);
                 }
             }
+
+            var targetShapes = _component.m_TargetShapes;
+            if (targetShapes == null || targetShapes.Length == 0)
+            {
+                return weights;
+            }
+
             for (int i = 0; i < count; i++)
             {
                 float weight = proxy.GetBlendShapeWeight(i);
@@ -328,7 +347,7 @@ namespace Triturbo.FaceBlendShapeFix
                     string blendShapeName = mesh.GetBlendShapeName(i);
                     if (skipShapeName != null && blendShapeName == skipShapeName) continue;
                     
-                    var current = _component.m_TargetShapes.FirstOrDefault(t => t.m_TargetShapeName == blendShapeName);
+                    var current = targetShapes.FirstOrDefault(t => t.m_TargetShapeName == blendShapeName);
                     if (current != null)
                     {
                         UpdateWeights(weights, proxy, current, weight);
