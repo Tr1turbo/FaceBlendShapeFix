@@ -4,6 +4,8 @@
     "editor.settings": "Settings",
     "editor.smooth_width": "Smooth Width",
     "editor.smooth_width.tooltip": "Width of the transition zone for L/R blend shape splitting. 0 = hard cut at center.",
+    "editor.target_renderer": "Target Renderer",
+    "editor.target_renderer.tooltip": "SkinnedMeshRenderer used as the source mesh for preview, auto-fill, and blendshape processing.",
     "editor.target_shapes": "BlendShapes Fix Target",
     "editor.category": "Category",
     "editor.category_databases": "Category Databases",

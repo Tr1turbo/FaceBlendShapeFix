@@ -4,6 +4,8 @@
     "editor.settings": "設定",
     "editor.smooth_width": "スムース幅",
     "editor.smooth_width.tooltip": "左右ブレンドシェイプ分割のトランジションゾーンの幅。0 = 中央でハードカット。",
+    "editor.target_renderer": "ターゲットレンダラー",
+    "editor.target_renderer.tooltip": "プレビュー、自動入力、ブレンドシェイプ処理の元メッシュとして使用する SkinnedMeshRenderer。",
     "editor.target_shapes": "シェイプキー修正対象",
     "editor.category": "カテゴリ",
     "editor.category_databases": "カテゴリデータベース",

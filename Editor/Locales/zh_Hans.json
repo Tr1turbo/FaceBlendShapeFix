@@ -4,6 +4,8 @@
     "editor.settings": "设置",
     "editor.smooth_width": "平滑宽度",
     "editor.smooth_width.tooltip": "左右形态键分割过渡区域的宽度。0 = 中心硬切割。",
+    "editor.target_renderer": "目标渲染器",
+    "editor.target_renderer.tooltip": "用于预览、自动填充和形态键处理源网格的 SkinnedMeshRenderer。",
     "editor.target_shapes": "形态键修复目标",
     "editor.category": "分类",
     "editor.category_databases": "分类数据库",

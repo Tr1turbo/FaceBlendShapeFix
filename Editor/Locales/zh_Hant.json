@@ -4,6 +4,8 @@
     "editor.settings": "設定",
     "editor.smooth_width": "平滑寬度",
     "editor.smooth_width.tooltip": "左右型態鍵分割過渡區域的寬度。0 = 中心硬切割。",
+    "editor.target_renderer": "目標渲染器",
+    "editor.target_renderer.tooltip": "用作預覽、自動填入與型態鍵處理來源網格的 SkinnedMeshRenderer。",
     "editor.target_shapes": "型態鍵修復目標",
     "editor.category": "分類",
     "editor.category_databases": "分類資料庫",

@@ -87,7 +87,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             targetShapesProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_TargetShapes));
             blendShapeDefinitionsProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_BlendShapeDefinitions));
             inspectorSettingsProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_InspectorSettings));
-            targetRendererProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_TargetRenderer));
+            targetRendererProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_TargetRendererReference));
             smoothWidthProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_SmoothWidth));
             categoryDatabasesProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_CategoryDatabases));
             customCategoryNamesProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_CustomCategoryNames));
@@ -198,7 +198,9 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     using (new EditorGUI.IndentLevelScope())
                     {
                         EditorGUI.BeginChangeCheck();
-                        EditorGUILayout.PropertyField(targetRendererProp);
+                        EditorGUILayout.PropertyField(
+                            targetRendererProp,
+                            L.G("editor.target_renderer"));
                         if (EditorGUI.EndChangeCheck())
                         {
                             serializedObject.ApplyModifiedProperties();

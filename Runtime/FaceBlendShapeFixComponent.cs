@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 #if FBF_VRCSDK_BASE
 using VRC.SDKBase;
@@ -13,15 +14,25 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
     , IEditorOnly
 #endif
     {
-        public SkinnedMeshRenderer m_TargetRenderer;
+        public AvatarObjectReference<SkinnedMeshRenderer> m_TargetRendererReference = new AvatarObjectReference<SkinnedMeshRenderer>();
+
+        [FormerlySerializedAs("m_TargetRenderer")]
+        [SerializeField]
+        [HideInInspector]
+        private SkinnedMeshRenderer m_LegacyTargetRenderer;
+
         public SkinnedMeshRenderer TargetRenderer
         {
             get
             {
-                if (m_TargetRenderer == null)
-                    return transform.GetComponent<SkinnedMeshRenderer>();
+                MigrateLegacyTargetRendererIfNeeded();
 
-                return m_TargetRenderer;
+                if (m_TargetRendererReference != null && m_TargetRendererReference.IsConfigured)
+                {
+                    return m_TargetRendererReference.Get(this);
+                }
+
+                return transform.GetComponent<SkinnedMeshRenderer>();
             }
         }
 
@@ -47,7 +58,40 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
 
         private void Reset()
         {
+            EnsureTargetRendererReferenceInitialized();
+            MigrateLegacyTargetRendererIfNeeded();
             m_CategoryDatabases = new[] { m_CategoryDatabase };
+        }
+
+        private void OnValidate()
+        {
+            EnsureTargetRendererReferenceInitialized();
+            MigrateLegacyTargetRendererIfNeeded();
+        }
+
+        private AvatarObjectReference<SkinnedMeshRenderer> EnsureTargetRendererReferenceInitialized()
+        {
+            if (m_TargetRendererReference == null)
+            {
+                m_TargetRendererReference = new AvatarObjectReference<SkinnedMeshRenderer>();
+            }
+
+            return m_TargetRendererReference;
+        }
+
+        private void MigrateLegacyTargetRendererIfNeeded()
+        {
+            AvatarObjectReference<SkinnedMeshRenderer> targetRendererReference = EnsureTargetRendererReferenceInitialized();
+
+            if (m_LegacyTargetRenderer != null && !targetRendererReference.IsConfigured)
+            {
+                targetRendererReference.Set(m_LegacyTargetRenderer);
+            }
+
+            if (m_LegacyTargetRenderer != null)
+            {
+                m_LegacyTargetRenderer = null;
+            }
         }
 
 

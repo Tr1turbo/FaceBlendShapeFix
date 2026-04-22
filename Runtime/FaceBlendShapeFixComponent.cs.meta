@@ -4,7 +4,6 @@ MonoImporter:
   externalObjects: {}
   serializedVersion: 2
   defaultReferences:
-  - m_TargetRenderer: {instanceID: 0}
   - m_CategoryDatabase: {fileID: 11400000, guid: e259aaf9d976a494585b1eb7c94db20e, type: 2}
   executionOrder: 0
   icon: {instanceID: 0}
