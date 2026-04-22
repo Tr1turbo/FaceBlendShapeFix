@@ -98,6 +98,8 @@ namespace Triturbo.FaceBlendShapeFix
             public HashSet<string> AdditiveShapes;
         }
 
+        // Resolved inverse preview data for one BlendData entry. All string-based lookups are
+        // paid during Refresh so OnFrame only touches numeric indices and multipliers.
         private struct InverseEntryCache
         {
             public int BaseIndex;
@@ -107,6 +109,8 @@ namespace Triturbo.FaceBlendShapeFix
             public float RightWeight;
         }
 
+        // Resolved additive preview data for one additive entry. The split/non-split weighting
+        // decision is also flattened here so the frame loop does not branch on authoring data.
         private struct AdditiveEntryCache
         {
             public int LeftIndex;
@@ -115,6 +119,8 @@ namespace Triturbo.FaceBlendShapeFix
             public float RightWeight;
         }
 
+        // Per-target cache consumed by OnFrame. This mirrors the authoring target shape, but all
+        // expensive mesh name resolution has already been converted into direct blend-shape indices.
         private sealed class TargetCache
         {
             public int ComponentTargetIndex;
@@ -128,10 +134,13 @@ namespace Triturbo.FaceBlendShapeFix
 
         private readonly FaceBlendShapeFixComponent _component;
         private readonly SkinnedMeshRenderer _sourceRenderer;
+        // Reused scratch state keeps the steady-state frame path allocation-free.
         private readonly Dictionary<int, float> _scratchWeights = new();
         private readonly Dictionary<string, TargetCache> _targetCacheByName = new(NameComparer);
         private readonly Dictionary<int, TargetCache> _targetCacheByComponentIndex = new();
         private readonly List<TargetCache> _targetCaches = new();
+        // Generated blend shapes live in the appended range of the preview mesh. We cache those
+        // indices once so each frame can zero only synthetic preview shapes, not the whole mesh.
         private readonly List<int> _generatedBlendShapeIndices = new();
         private PreviewMeshData _previewData;
         private float _smoothWidth;
@@ -177,6 +186,13 @@ namespace Triturbo.FaceBlendShapeFix
 
             using (RefreshMarker.Auto())
             {
+                // Refresh is the only place where we intentionally do the expensive work:
+                // 1. observe the current preview topology requirements
+                // 2. rebuild the preview mesh if the required split-shape sets changed
+                // 3. rebuild cached target metadata if either the mesh changed or authoring data changed
+                //
+                // This keeps steady-state OnFrame limited to cached numeric indices and one reusable
+                // scratch dictionary, which is the main optimization in this pass.
                 HashSet<string> neededInvShapes = context.Observe(_sourceRenderer, ComputeNeededInvShapes);
                 HashSet<string> neededAddShapes = context.Observe(_component, ComputeNeededAddShapes);
                 int configurationSignature = context.Observe(_component, ComputeConfigurationSignature);
@@ -236,68 +252,75 @@ namespace Triturbo.FaceBlendShapeFix
             bool logEnabled = FaceBlendShapeFixPreviewProfiling.Enabled;
             long startTicks = logEnabled ? Stopwatch.GetTimestamp() : 0L;
             int appliedTargetCount = 0;
+            PreviewRequest previewRequest = default;
+            bool hasPreviewRequest = _component != null && _component.TryGetPreviewRequest(out previewRequest);
+            bool passivePreviewEnabled = FaceBlendShapeFixPreviewSettings.PassivePreviewEnabled;
 
             using (OnFrameMarker.Auto())
             {
-                if (_previewData.Mesh != null)
-                {
-                    proxySmr.sharedMesh = _previewData.Mesh;
-                }
-
-                _scratchWeights.Clear();
-                ZeroGeneratedBlendShapeWeights(_scratchWeights);
-
+                // Explicit preview always wins. Passive preview is the legacy "read live target weights
+                // every frame" behavior and can now be globally disabled. When both are off we leave the
+                // proxy visually inert by not assigning the preview mesh and by skipping all cached work.
                 string skipShapeName = null;
                 TargetCache previewTargetCache = null;
 
-                if (_component != null &&
-                    _component.TryGetPreviewRequest(out PreviewRequest request) &&
-                    TryGetPreviewTargetCache(request, out previewTargetCache))
+                if (hasPreviewRequest &&
+                    TryGetPreviewTargetCache(previewRequest, out previewTargetCache))
                 {
                     skipShapeName = previewTargetCache.TargetName;
                 }
-                else if (_component != null &&
-                         _component.TryGetPreviewRequest(out PreviewRequest fallbackRequest) &&
-                         fallbackRequest.Target != null)
+                else if (hasPreviewRequest && previewRequest.Target != null)
                 {
-                    skipShapeName = fallbackRequest.Target.m_TargetShapeName;
+                    skipShapeName = previewRequest.Target.m_TargetShapeName;
                 }
 
-                using (ApplyCachedTargetsMarker.Auto())
+                if (hasPreviewRequest || passivePreviewEnabled)
                 {
-                    foreach (TargetCache targetCache in _targetCaches)
+                    if (_previewData.Mesh != null)
                     {
-                        if (skipShapeName != null && targetCache.TargetName == skipShapeName)
+                        proxySmr.sharedMesh = _previewData.Mesh;
+                    }
+
+                    // Clear only the reusable scratch state. All generated preview-only shapes are then
+                    // seeded to zero so any omitted writes this frame do not leave stale .inv/.add values
+                    // behind from a previous preview target or previous live weights.
+                    _scratchWeights.Clear();
+                    ZeroGeneratedBlendShapeWeights(_scratchWeights);
+
+                    using (ApplyCachedTargetsMarker.Auto())
+                    {
+                        foreach (TargetCache targetCache in _targetCaches)
                         {
-                            continue;
+                            if (skipShapeName != null && targetCache.TargetName == skipShapeName)
+                            {
+                                continue;
+                            }
+
+                            float baseWeight = proxySmr.GetBlendShapeWeight(targetCache.TargetBlendShapeIndex);
+                            if (baseWeight <= 0f)
+                            {
+                                continue;
+                            }
+
+                            ApplyTargetWeights(_scratchWeights, proxySmr, targetCache, baseWeight);
+                            appliedTargetCount++;
+                        }
+                    }
+
+                    if (hasPreviewRequest && previewTargetCache != null)
+                    {
+                        using (ApplyPreviewTargetMarker.Auto())
+                        {
+                            ApplyTargetWeights(_scratchWeights, proxySmr, previewTargetCache, previewRequest.Weight);
                         }
 
-                        float baseWeight = proxySmr.GetBlendShapeWeight(targetCache.TargetBlendShapeIndex);
-                        if (baseWeight <= 0f)
-                        {
-                            continue;
-                        }
-
-                        ApplyTargetWeights(_scratchWeights, proxySmr, targetCache, baseWeight);
                         appliedTargetCount++;
                     }
-                }
 
-                if (_component != null &&
-                    _component.TryGetPreviewRequest(out PreviewRequest previewRequest) &&
-                    previewTargetCache != null)
-                {
-                    using (ApplyPreviewTargetMarker.Auto())
+                    foreach (KeyValuePair<int, float> weight in _scratchWeights)
                     {
-                        ApplyTargetWeights(_scratchWeights, proxySmr, previewTargetCache, previewRequest.Weight);
+                        proxySmr.SetBlendShapeWeight(weight.Key, weight.Value);
                     }
-
-                    appliedTargetCount++;
-                }
-
-                foreach (KeyValuePair<int, float> weight in _scratchWeights)
-                {
-                    proxySmr.SetBlendShapeWeight(weight.Key, weight.Value);
                 }
             }
 
@@ -321,6 +344,8 @@ namespace Triturbo.FaceBlendShapeFix
             TargetCache targetCache,
             float weight)
         {
+            // The target cache already contains fully resolved indices, so the frame path only reads
+            // current base weights from the proxy and accumulates numeric output weights.
             weights[targetCache.TargetBlendShapeIndex] = weight * targetCache.TargetWeight;
 
             float factor = weight / 100f;
@@ -358,6 +383,8 @@ namespace Triturbo.FaceBlendShapeFix
 
         private void ZeroGeneratedBlendShapeWeights(Dictionary<int, float> weights)
         {
+            // Only synthetic preview shapes need to be force-zeroed here. Base mesh blend shapes are
+            // still driven by the proxy's existing weights and should not be overwritten pre-emptively.
             foreach (int index in _generatedBlendShapeIndices)
             {
                 weights[index] = 0f;
@@ -386,6 +413,9 @@ namespace Triturbo.FaceBlendShapeFix
 
         private void RebuildTargetCaches()
         {
+            // Cache rebuilds are coarse on purpose. Refresh already knows when either the preview mesh
+            // topology or the authoring configuration changed, so rebuilding everything in one pass keeps
+            // the implementation simple and guarantees OnFrame never has to validate names or definitions.
             ClearTargetCaches();
 
             Mesh sourceMesh = _sourceRenderer.sharedMesh;
@@ -436,6 +466,9 @@ namespace Triturbo.FaceBlendShapeFix
 
         private void CacheGeneratedBlendShapeIndices(int sourceBlendShapeCount, int previewBlendShapeCount)
         {
+            // PreviewMeshBuilder appends generated .inv/.add shapes after the original mesh range.
+            // Caching that appended range once avoids scanning the mesh or rebuilding a dictionary
+            // just to clear preview-only weights every frame.
             for (int i = sourceBlendShapeCount; i < previewBlendShapeCount; i++)
             {
                 _generatedBlendShapeIndices.Add(i);
@@ -461,6 +494,8 @@ namespace Triturbo.FaceBlendShapeFix
                 return null;
             }
 
+            // Invalid targets are filtered out once during cache build. After that, OnFrame can
+            // trust every cached target and stay free of string lookups and structural checks.
             return new TargetCache
             {
                 ComponentTargetIndex = componentTargetIndex,
@@ -482,6 +517,8 @@ namespace Triturbo.FaceBlendShapeFix
                 return Array.Empty<InverseEntryCache>();
             }
 
+            // Resolve global definitions once during cache build. Calling GetBlendData in OnFrame would
+            // re-expand authoring data every frame, which is exactly what this optimization avoids.
             IReadOnlyList<BlendData> resolvedBlendData = targetShape.GetBlendData(definitionLookup);
             if (resolvedBlendData == null || resolvedBlendData.Count == 0)
             {
@@ -496,6 +533,8 @@ namespace Triturbo.FaceBlendShapeFix
                     continue;
                 }
 
+                // All native GetBlendShapeIndex(string) calls and suffix-name construction are moved
+                // here so the steady-state frame loop never pays repeated O(n) name resolution costs.
                 int baseIndex = previewMesh.GetBlendShapeIndex(data.m_TargetShapeName);
                 if (baseIndex < 0)
                 {
@@ -539,6 +578,8 @@ namespace Triturbo.FaceBlendShapeFix
                     continue;
                 }
 
+                // Additive suffix resolution is also flattened up front. OnFrame receives only the
+                // left/right numeric targets and the final multipliers to accumulate.
                 string rightName = data.m_TargetShapeName + ".add.R";
                 string leftName = data.m_TargetShapeName + ".add.L";
                 int rightIndex = previewMesh.GetBlendShapeIndex(rightName);
@@ -568,6 +609,8 @@ namespace Triturbo.FaceBlendShapeFix
                 return null;
             }
 
+            // One refresh-scoped lookup replaces repeated linear scans through global definitions when
+            // target caches resolve their effective BlendData payload.
             var lookup = new Dictionary<string, BlendShapeDefinition>(definitions.Length, NameComparer);
             foreach (BlendShapeDefinition definition in definitions)
             {
@@ -662,6 +705,9 @@ namespace Triturbo.FaceBlendShapeFix
 
         private static int ComputeConfigurationSignature(FaceBlendShapeFixComponent component)
         {
+            // The signature intentionally covers authoring data that changes cached output even when
+            // the preview mesh topology stays the same. That lets Refresh skip cache rebuilds in the
+            // common steady-state case while still rebuilding immediately after edits or renames.
             unchecked
             {
                 int hash = 17;
@@ -770,6 +816,9 @@ namespace Triturbo.FaceBlendShapeFix
                 return;
             }
 
+            // The preview mesh is rebuilt from the full required sets rather than only ever growing.
+            // Using full set equality in Refresh means split shapes can both appear and disappear,
+            // preventing long editor sessions from accumulating stale generated blend shapes.
             _previewData.Mesh = PreviewMeshBuilder.BuildPreviewMesh(mesh, inverseShapes, additiveShapes, _smoothWidth);
         }
 

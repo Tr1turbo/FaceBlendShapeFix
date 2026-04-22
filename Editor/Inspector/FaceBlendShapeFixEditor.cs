@@ -206,6 +206,16 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                         }
 
                         EditorGUILayout.PropertyField(smoothWidthProp, L.G("editor.smooth_width"));
+                        EditorGUI.BeginChangeCheck();
+                        bool passivePreviewEnabled = EditorGUILayout.Toggle(
+                            FaceBlendShapeFixPreviewSettings.PassivePreviewContent,
+                            FaceBlendShapeFixPreviewSettings.PassivePreviewEnabled);
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            FaceBlendShapeFixPreviewSettings.PassivePreviewEnabled = passivePreviewEnabled;
+                            UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+                        }
+
                         EditorGUILayout.PropertyField(inspectorSettingsProp);
                         EditorGUILayout.PropertyField(categoryDatabasesProp, CategoryDatabasesContent, true);
                         EditorGUILayout.PropertyField(customCategoryNamesProp, CustomCategoryNamesContent, true);

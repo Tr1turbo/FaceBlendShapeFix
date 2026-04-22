@@ -40,6 +40,8 @@
 
     "editor.preview.enter": "預覽",
     "editor.preview.exit": "結束預覽",
+    "editor.preview.passive_preview": "被動預覽",
+    "editor.preview.passive_preview.tooltip": "全域編輯器設定。啟用時，即使未按下預覽，也會根據目標渲染器目前的型態鍵權重顯示預覽。停用後，只有使用預覽按鈕或滑桿時才會預覽。",
 
     "editor.main_weight": "主權重",
     "editor.main_weight.tooltip": "套用於此修復目標型態鍵本身的權重。",

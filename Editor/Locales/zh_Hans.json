@@ -40,6 +40,8 @@
 
     "editor.preview.enter": "预览",
     "editor.preview.exit": "退出预览",
+    "editor.preview.passive_preview": "被动预览",
+    "editor.preview.passive_preview.tooltip": "全局编辑器设置。启用时，即使不按下预览，也会根据目标渲染器当前的形态键权重显示预览。禁用后，只有使用预览按钮或滑块时才会预览。",
 
     "editor.main_weight": "主权重",
     "editor.main_weight.tooltip": "应用于此修复目标形态键本身的权重。",

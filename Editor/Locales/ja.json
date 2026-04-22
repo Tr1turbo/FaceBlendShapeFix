@@ -40,6 +40,8 @@
 
     "editor.preview.enter": "プレビュー",
     "editor.preview.exit": "プレビュー終了",
+    "editor.preview.passive_preview": "パッシブプレビュー",
+    "editor.preview.passive_preview.tooltip": "グローバルなエディター設定です。有効な場合、Preview を押さなくてもターゲットレンダラーの現在のシェイプキー値に追従してプレビューします。無効にすると、Preview ボタンまたはスライダー操作時のみプレビューします。",
 
     "editor.main_weight": "メインウェイト",
     "editor.main_weight.tooltip": "この修正対象シェイプキー自体に適用されるウェイト。",

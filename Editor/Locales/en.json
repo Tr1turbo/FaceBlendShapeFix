@@ -40,6 +40,8 @@
 
     "editor.preview.enter": "Preview",
     "editor.preview.exit": "Exit Preview",
+    "editor.preview.passive_preview": "Passive Preview",
+    "editor.preview.passive_preview.tooltip": "Global editor setting. When enabled, preview follows the target renderer's live blendshape weights without pressing Preview. Disable this to preview only from the Preview button or slider.",
 
     "editor.main_weight": "Main Weight",
     "editor.main_weight.tooltip": "The weight applied to this fix target blendshape itself.",
