@@ -2,13 +2,13 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Threading.Tasks;
 using nadena.dev.ndmf.preview;
 using Triturbo.FaceBlendShapeFix.Runtime;
-using UnityEditor;
+using Unity.Profiling;
 using UnityEngine;
 using Object = UnityEngine.Object;
+using Stopwatch = System.Diagnostics.Stopwatch;
 
 
 namespace Triturbo.FaceBlendShapeFix
@@ -83,6 +83,14 @@ namespace Triturbo.FaceBlendShapeFix
     
     internal sealed class ShapeBlendPreviewNode : IRenderFilterNode
     {
+        private static readonly StringComparer NameComparer = StringComparer.Ordinal;
+        private static readonly ProfilerMarker RefreshMarker = new("FaceBlendShapeFixPreview.Refresh");
+        private static readonly ProfilerMarker OnFrameMarker = new("FaceBlendShapeFixPreview.OnFrame");
+        private static readonly ProfilerMarker RebuildPreviewMeshMarker = new("FaceBlendShapeFixPreview.RebuildPreviewMesh");
+        private static readonly ProfilerMarker RebuildTargetCachesMarker = new("FaceBlendShapeFixPreview.RebuildTargetCaches");
+        private static readonly ProfilerMarker ApplyCachedTargetsMarker = new("FaceBlendShapeFixPreview.ApplyCachedTargets");
+        private static readonly ProfilerMarker ApplyPreviewTargetMarker = new("FaceBlendShapeFixPreview.ApplyPreviewTarget");
+
         private struct PreviewMeshData
         {
             public Mesh Mesh;
@@ -90,15 +98,44 @@ namespace Triturbo.FaceBlendShapeFix
             public HashSet<string> AdditiveShapes;
         }
 
+        private struct InverseEntryCache
+        {
+            public int BaseIndex;
+            public int LeftIndex;
+            public int RightIndex;
+            public float LeftWeight;
+            public float RightWeight;
+        }
+
+        private struct AdditiveEntryCache
+        {
+            public int LeftIndex;
+            public int RightIndex;
+            public float LeftWeight;
+            public float RightWeight;
+        }
+
+        private sealed class TargetCache
+        {
+            public int ComponentTargetIndex;
+            public string TargetName;
+            public int TargetBlendShapeIndex;
+            public float TargetWeight;
+            public InverseEntryCache[] InverseEntries = Array.Empty<InverseEntryCache>();
+            public AdditiveEntryCache[] AdditiveEntries = Array.Empty<AdditiveEntryCache>();
+        }
+
 
         private readonly FaceBlendShapeFixComponent _component;
         private readonly SkinnedMeshRenderer _sourceRenderer;
+        private readonly Dictionary<int, float> _scratchWeights = new();
+        private readonly Dictionary<string, TargetCache> _targetCacheByName = new(NameComparer);
+        private readonly Dictionary<int, TargetCache> _targetCacheByComponentIndex = new();
+        private readonly List<TargetCache> _targetCaches = new();
+        private readonly List<int> _generatedBlendShapeIndices = new();
         private PreviewMeshData _previewData;
-
         private float _smoothWidth;
-
-        private readonly List<(TargetShape targetShape, float weight)> _activeTargets = new();
-
+        private int _configurationSignature;
 
 
         public RenderAspects WhatChanged => RenderAspects.Mesh | RenderAspects.Shapes;
@@ -133,39 +170,57 @@ namespace Triturbo.FaceBlendShapeFix
                 return Task.FromResult<IRenderFilterNode>(this);
             }
 
-            bool needsRebuild = false;
+            bool logEnabled = FaceBlendShapeFixPreviewProfiling.Enabled;
+            long startTicks = logEnabled ? Stopwatch.GetTimestamp() : 0L;
+            bool meshRebuilt = false;
+            bool cacheRebuilt = false;
 
-            var neededInvShapes = _previewData.InverseShapes;
-            // Check if we need inv shapes that don't exist on the preview mesh
-            if ((updatedAspects & RenderAspects.Shapes) != 0)
+            using (RefreshMarker.Auto())
             {
-                neededInvShapes = ComputeNeededInvShapes(_component, _sourceRenderer);
-                if (_previewData.InverseShapes == null || neededInvShapes.Any(s => !_previewData.InverseShapes.Contains(s)))
+                HashSet<string> neededInvShapes = context.Observe(_sourceRenderer, ComputeNeededInvShapes);
+                HashSet<string> neededAddShapes = context.Observe(_component, ComputeNeededAddShapes);
+                int configurationSignature = context.Observe(_component, ComputeConfigurationSignature);
+                float currentSmoothWidth = context.Observe(_component, c => c.m_SmoothWidth);
+
+                bool needsMeshRebuild =
+                    _previewData.Mesh == null ||
+                    (updatedAspects & RenderAspects.Mesh) != 0 ||
+                    !ShapeSetsEqual(neededInvShapes, _previewData.InverseShapes) ||
+                    !ShapeSetsEqual(neededAddShapes, _previewData.AdditiveShapes) ||
+                    Math.Abs(currentSmoothWidth - _smoothWidth) > float.Epsilon;
+
+                _smoothWidth = currentSmoothWidth;
+
+                if (needsMeshRebuild)
                 {
-                    needsRebuild = true;
+                    meshRebuilt = true;
+                    using (RebuildPreviewMeshMarker.Auto())
+                    {
+                        RebuildPreviewMesh(neededInvShapes, neededAddShapes);
+                    }
+                }
+
+                bool needsCacheRebuild =
+                    needsMeshRebuild ||
+                    _configurationSignature != configurationSignature;
+
+                if (needsCacheRebuild)
+                {
+                    cacheRebuilt = true;
+                    _configurationSignature = configurationSignature;
+                    using (RebuildTargetCachesMarker.Auto())
+                    {
+                        RebuildTargetCaches();
+                    }
                 }
             }
 
-            // Check if we need add shapes that don't exist on the preview mesh
-            var neededAddShapes = context.Observe(_component, ComputeNeededAddShapes);
-            if (_previewData.AdditiveShapes == null || neededAddShapes.Any(s => !_previewData.AdditiveShapes.Contains(s)))
+            if (logEnabled)
             {
-                needsRebuild = true;
-            }
-
-            // Check if smooth width changed
-            float currentSmoothWidth = context.Observe(_component, c => c.m_SmoothWidth);
-            if (Math.Abs(currentSmoothWidth - _smoothWidth) > float.Epsilon)
-            {
-                _smoothWidth = currentSmoothWidth;
-                needsRebuild = true;
-            }
-
-            
-            // Rebuild only when activation hash changed, smooth width changed, or upstream mesh changed
-            if (needsRebuild || (updatedAspects & RenderAspects.Mesh) != 0 || context.IsInvalidated)
-            {
-                RebuildPreviewMesh(neededInvShapes, neededAddShapes);
+                FaceBlendShapeFixPreviewProfiling.RecordRefresh(
+                    Stopwatch.GetTimestamp() - startTicks,
+                    meshRebuilt,
+                    cacheRebuilt);
             }
 
             return Task.FromResult<IRenderFilterNode>(this);
@@ -173,188 +228,358 @@ namespace Triturbo.FaceBlendShapeFix
 
         public void OnFrame(Renderer original, Renderer proxy)
         {
-            if (original is not SkinnedMeshRenderer source || proxy is not SkinnedMeshRenderer proxySmr)
+            if (original is not SkinnedMeshRenderer || proxy is not SkinnedMeshRenderer proxySmr)
             {
                 return;
             }
 
-            if (_previewData.Mesh != null)
+            bool logEnabled = FaceBlendShapeFixPreviewProfiling.Enabled;
+            long startTicks = logEnabled ? Stopwatch.GetTimestamp() : 0L;
+            int appliedTargetCount = 0;
+
+            using (OnFrameMarker.Auto())
             {
-                proxySmr.sharedMesh = _previewData.Mesh;
+                if (_previewData.Mesh != null)
+                {
+                    proxySmr.sharedMesh = _previewData.Mesh;
+                }
+
+                _scratchWeights.Clear();
+                ZeroGeneratedBlendShapeWeights(_scratchWeights);
+
+                string skipShapeName = null;
+                TargetCache previewTargetCache = null;
+
+                if (_component != null &&
+                    _component.TryGetPreviewRequest(out PreviewRequest request) &&
+                    TryGetPreviewTargetCache(request, out previewTargetCache))
+                {
+                    skipShapeName = previewTargetCache.TargetName;
+                }
+                else if (_component != null &&
+                         _component.TryGetPreviewRequest(out PreviewRequest fallbackRequest) &&
+                         fallbackRequest.Target != null)
+                {
+                    skipShapeName = fallbackRequest.Target.m_TargetShapeName;
+                }
+
+                using (ApplyCachedTargetsMarker.Auto())
+                {
+                    foreach (TargetCache targetCache in _targetCaches)
+                    {
+                        if (skipShapeName != null && targetCache.TargetName == skipShapeName)
+                        {
+                            continue;
+                        }
+
+                        float baseWeight = proxySmr.GetBlendShapeWeight(targetCache.TargetBlendShapeIndex);
+                        if (baseWeight <= 0f)
+                        {
+                            continue;
+                        }
+
+                        ApplyTargetWeights(_scratchWeights, proxySmr, targetCache, baseWeight);
+                        appliedTargetCount++;
+                    }
+                }
+
+                if (_component != null &&
+                    _component.TryGetPreviewRequest(out PreviewRequest previewRequest) &&
+                    previewTargetCache != null)
+                {
+                    using (ApplyPreviewTargetMarker.Auto())
+                    {
+                        ApplyTargetWeights(_scratchWeights, proxySmr, previewTargetCache, previewRequest.Weight);
+                    }
+
+                    appliedTargetCount++;
+                }
+
+                foreach (KeyValuePair<int, float> weight in _scratchWeights)
+                {
+                    proxySmr.SetBlendShapeWeight(weight.Key, weight.Value);
+                }
             }
 
-            Dictionary<int, float> targetWeights;
-            if (_component != null && _component.TryGetPreviewRequest(out var request) && request.Target != null)
+            if (logEnabled)
             {
-                targetWeights = CalculateProxyWeights(_sourceRenderer, proxySmr, request.Target.m_TargetShapeName);
-                UpdateWeights(targetWeights, proxySmr, request.Target, request.Weight);
+                FaceBlendShapeFixPreviewProfiling.RecordFrame(
+                    Stopwatch.GetTimestamp() - startTicks,
+                    appliedTargetCount,
+                    _targetCaches.Count,
+                    _generatedBlendShapeIndices.Count);
             }
-            else
-            {
-                targetWeights = CalculateProxyWeights(_sourceRenderer, proxySmr);
-            }
-
-            foreach (var weight in targetWeights)
-            {
-                proxySmr.SetBlendShapeWeight(weight.Key, weight.Value);
-            }
-
         }
 
         #endregion
 
         #region Weight Calculation
 
-        private void UpdateWeights(Dictionary<int, float> weights, SkinnedMeshRenderer proxy, TargetShape current, float weight)
-        {
-            Mesh mesh = proxy.sharedMesh;
-            int targetIndex = mesh.GetBlendShapeIndex(current.m_TargetShapeName);
-            weights[targetIndex] = weight * current.m_Weight;
-            
-            var blendData = current.GetBlendData(_component.m_BlendShapeDefinitions);
-            foreach (var data in blendData)
-            {
-                if (data == null) continue;
-                int baseIndex = mesh.GetBlendShapeIndex(data.m_TargetShapeName);
-                if (baseIndex < 0) continue;
-                float baseWeight = proxy.GetBlendShapeWeight(baseIndex);
-                
-                int rightIndex = mesh.GetBlendShapeIndex(data.m_TargetShapeName + ".inv.R");
-                int leftIndex = mesh.GetBlendShapeIndex(data.m_TargetShapeName + ".inv.L");
-                if (rightIndex == -1 || leftIndex == -1)
-                {
-                    continue;
-                };
-
-                float factor = weight / 100f;
-                float reducedLeft = baseWeight * data.m_LeftWeight * factor;
-                float reducedRight = baseWeight * data.m_RightWeight * factor;
-                    
-                if (!weights.TryAdd(rightIndex, reducedRight))
-                {
-                    weights[rightIndex] += reducedRight;
-                }
-                if (!weights.TryAdd(leftIndex, reducedLeft))
-                {
-                    weights[leftIndex] += reducedLeft;
-                }
-                
-            }
-
-            if (ApplyAdditiveBlendData(weights, proxy, current.m_AdditiveBlendData, weight))
-            {
-                // InvalidatePreviewMesh();
-                // UpdateAdditionalBlendShapeHash();
-                // RebuildPreviewMesh();
-                // if (_previewMesh != null)
-                // {
-                //     proxy.sharedMesh = _previewMesh;
-                // }
-            }
-        }
-
-        private static bool ApplyAdditiveBlendData(
+        private static void ApplyTargetWeights(
             Dictionary<int, float> weights,
             SkinnedMeshRenderer proxy,
-            IEnumerable<BlendData> additionalBlendData,
-            float intensity)
+            TargetCache targetCache,
+            float weight)
         {
-            if (additionalBlendData == null)
-            {
-                return false;
-            }
+            weights[targetCache.TargetBlendShapeIndex] = weight * targetCache.TargetWeight;
 
-            Mesh mesh = proxy.sharedMesh;
-            bool missingBlendShape = false;
-
-            foreach (var data in additionalBlendData)
+            float factor = weight / 100f;
+            foreach (InverseEntryCache entry in targetCache.InverseEntries)
             {
-                if (data == null)
+                float baseWeight = proxy.GetBlendShapeWeight(entry.BaseIndex);
+                if (baseWeight <= 0f)
                 {
                     continue;
                 }
-                float leftWeight = data.m_SplitLeftRight ? data.m_LeftWeight : data.m_Weight;
-                float rightWeight = data.m_SplitLeftRight ? data.m_RightWeight : data.m_Weight;
 
-                int rightIndex = mesh.GetBlendShapeIndex(data.m_TargetShapeName + ".add.R");
-                int leftIndex = mesh.GetBlendShapeIndex(data.m_TargetShapeName + ".add.L");
-                if (rightIndex == -1 || leftIndex == -1)
-                {
-                    //if no original blendshape found, m_TargetShapeName is invalid and ignore missing
-                    missingBlendShape = mesh.GetBlendShapeIndex(data.m_TargetShapeName) != -1;
-                    continue;
-                }
-
-                float additiveLeft = leftWeight * intensity;
-                float additiveRight = rightWeight * intensity;
-
-                if (!weights.TryAdd(rightIndex, additiveRight))
-                {
-                    weights[rightIndex] += additiveRight;
-                }
-                if (!weights.TryAdd(leftIndex, additiveLeft))
-                {
-                    weights[leftIndex] += additiveLeft;
-                }
+                AccumulateWeight(weights, entry.RightIndex, baseWeight * entry.RightWeight * factor);
+                AccumulateWeight(weights, entry.LeftIndex, baseWeight * entry.LeftWeight * factor);
             }
 
-            return missingBlendShape;
+            foreach (AdditiveEntryCache entry in targetCache.AdditiveEntries)
+            {
+                AccumulateWeight(weights, entry.RightIndex, entry.RightWeight * weight);
+                AccumulateWeight(weights, entry.LeftIndex, entry.LeftWeight * weight);
+            }
         }
-        
-        private Dictionary<int, float> CalculateProxyWeights(SkinnedMeshRenderer source, SkinnedMeshRenderer proxy, string skipShapeName = null)
+
+        private static void AccumulateWeight(Dictionary<int, float> weights, int index, float delta)
         {
-            Dictionary<int, float> weights = new Dictionary<int, float>();
-
-            _activeTargets.Clear();
-
-            if (_component == null)
+            if (index < 0 || Mathf.Approximately(delta, 0f))
             {
-                return weights;
+                return;
             }
 
-            var mesh = source.sharedMesh;
-            if (mesh == null)
+            if (!weights.TryAdd(index, delta))
             {
-                return weights;
+                weights[index] += delta;
+            }
+        }
+
+        private void ZeroGeneratedBlendShapeWeights(Dictionary<int, float> weights)
+        {
+            foreach (int index in _generatedBlendShapeIndices)
+            {
+                weights[index] = 0f;
+            }
+        }
+
+        private bool TryGetPreviewTargetCache(PreviewRequest request, out TargetCache targetCache)
+        {
+            if (_targetCacheByComponentIndex.TryGetValue(request.TargetIndex, out targetCache))
+            {
+                return true;
             }
 
-            var proxyMesh = proxy.sharedMesh;
-            if (proxyMesh == null)
+            if (request.Target != null && !string.IsNullOrEmpty(request.Target.m_TargetShapeName))
             {
-                return weights;
-            }
-            
-            int count = mesh.blendShapeCount;
-            if (proxyMesh.blendShapeCount > count)
-            {
-                for (int i = count; i < proxyMesh.blendShapeCount; i++)
-                {
-                    weights.Add(i, 0f);
-                }
+                return _targetCacheByName.TryGetValue(request.Target.m_TargetShapeName, out targetCache);
             }
 
-            var targetShapes = _component.m_TargetShapes;
+            targetCache = null;
+            return false;
+        }
+
+        #endregion
+
+        #region Cache Management
+
+        private void RebuildTargetCaches()
+        {
+            ClearTargetCaches();
+
+            Mesh sourceMesh = _sourceRenderer.sharedMesh;
+            Mesh previewMesh = _previewData.Mesh;
+            if (sourceMesh == null || previewMesh == null)
+            {
+                return;
+            }
+
+            CacheGeneratedBlendShapeIndices(sourceMesh.blendShapeCount, previewMesh.blendShapeCount);
+
+            TargetShape[] targetShapes = _component.m_TargetShapes;
             if (targetShapes == null || targetShapes.Length == 0)
             {
-                return weights;
+                return;
             }
 
-            for (int i = 0; i < count; i++)
+            IReadOnlyDictionary<string, BlendShapeDefinition> definitionLookup =
+                BuildDefinitionLookup(_component.m_BlendShapeDefinitions);
+
+            for (int i = 0; i < targetShapes.Length; i++)
             {
-                float weight = proxy.GetBlendShapeWeight(i);
-                if (weight > 0)
+                TargetCache targetCache = BuildTargetCache(previewMesh, targetShapes[i], i, definitionLookup);
+                if (targetCache == null)
                 {
-                    string blendShapeName = mesh.GetBlendShapeName(i);
-                    if (skipShapeName != null && blendShapeName == skipShapeName) continue;
-                    
-                    var current = targetShapes.FirstOrDefault(t => t.m_TargetShapeName == blendShapeName);
-                    if (current != null)
-                    {
-                        UpdateWeights(weights, proxy, current, weight);
-                    }
+                    continue;
                 }
+
+                _targetCacheByComponentIndex[i] = targetCache;
+                if (_targetCacheByName.ContainsKey(targetCache.TargetName))
+                {
+                    continue;
+                }
+
+                _targetCacheByName.Add(targetCache.TargetName, targetCache);
+                _targetCaches.Add(targetCache);
             }
-            return weights;
+        }
+
+        private void ClearTargetCaches()
+        {
+            _scratchWeights.Clear();
+            _targetCacheByName.Clear();
+            _targetCacheByComponentIndex.Clear();
+            _targetCaches.Clear();
+            _generatedBlendShapeIndices.Clear();
+        }
+
+        private void CacheGeneratedBlendShapeIndices(int sourceBlendShapeCount, int previewBlendShapeCount)
+        {
+            for (int i = sourceBlendShapeCount; i < previewBlendShapeCount; i++)
+            {
+                _generatedBlendShapeIndices.Add(i);
+            }
+        }
+
+        private static TargetCache BuildTargetCache(
+            Mesh previewMesh,
+            TargetShape targetShape,
+            int componentTargetIndex,
+            IReadOnlyDictionary<string, BlendShapeDefinition> definitionLookup)
+        {
+            if (previewMesh == null ||
+                targetShape == null ||
+                string.IsNullOrEmpty(targetShape.m_TargetShapeName))
+            {
+                return null;
+            }
+
+            int targetBlendShapeIndex = previewMesh.GetBlendShapeIndex(targetShape.m_TargetShapeName);
+            if (targetBlendShapeIndex < 0)
+            {
+                return null;
+            }
+
+            return new TargetCache
+            {
+                ComponentTargetIndex = componentTargetIndex,
+                TargetName = targetShape.m_TargetShapeName,
+                TargetBlendShapeIndex = targetBlendShapeIndex,
+                TargetWeight = targetShape.m_Weight,
+                InverseEntries = BuildInverseEntryCaches(previewMesh, targetShape, definitionLookup),
+                AdditiveEntries = BuildAdditiveEntryCaches(previewMesh, targetShape.m_AdditiveBlendData)
+            };
+        }
+
+        private static InverseEntryCache[] BuildInverseEntryCaches(
+            Mesh previewMesh,
+            TargetShape targetShape,
+            IReadOnlyDictionary<string, BlendShapeDefinition> definitionLookup)
+        {
+            if (previewMesh == null || targetShape?.m_BlendData == null || targetShape.m_BlendData.Length == 0)
+            {
+                return Array.Empty<InverseEntryCache>();
+            }
+
+            IReadOnlyList<BlendData> resolvedBlendData = targetShape.GetBlendData(definitionLookup);
+            if (resolvedBlendData == null || resolvedBlendData.Count == 0)
+            {
+                return Array.Empty<InverseEntryCache>();
+            }
+
+            var entries = new List<InverseEntryCache>(resolvedBlendData.Count);
+            foreach (BlendData data in resolvedBlendData)
+            {
+                if (data == null || string.IsNullOrEmpty(data.m_TargetShapeName))
+                {
+                    continue;
+                }
+
+                int baseIndex = previewMesh.GetBlendShapeIndex(data.m_TargetShapeName);
+                if (baseIndex < 0)
+                {
+                    continue;
+                }
+
+                string rightName = data.m_TargetShapeName + ".inv.R";
+                string leftName = data.m_TargetShapeName + ".inv.L";
+                int rightIndex = previewMesh.GetBlendShapeIndex(rightName);
+                int leftIndex = previewMesh.GetBlendShapeIndex(leftName);
+                if (rightIndex < 0 || leftIndex < 0)
+                {
+                    continue;
+                }
+
+                entries.Add(new InverseEntryCache
+                {
+                    BaseIndex = baseIndex,
+                    LeftIndex = leftIndex,
+                    RightIndex = rightIndex,
+                    LeftWeight = data.m_LeftWeight,
+                    RightWeight = data.m_RightWeight
+                });
+            }
+
+            return entries.Count == 0 ? Array.Empty<InverseEntryCache>() : entries.ToArray();
+        }
+
+        private static AdditiveEntryCache[] BuildAdditiveEntryCaches(Mesh previewMesh, BlendData[] additiveBlendData)
+        {
+            if (previewMesh == null || additiveBlendData == null || additiveBlendData.Length == 0)
+            {
+                return Array.Empty<AdditiveEntryCache>();
+            }
+
+            var entries = new List<AdditiveEntryCache>(additiveBlendData.Length);
+            foreach (BlendData data in additiveBlendData)
+            {
+                if (data == null || string.IsNullOrEmpty(data.m_TargetShapeName))
+                {
+                    continue;
+                }
+
+                string rightName = data.m_TargetShapeName + ".add.R";
+                string leftName = data.m_TargetShapeName + ".add.L";
+                int rightIndex = previewMesh.GetBlendShapeIndex(rightName);
+                int leftIndex = previewMesh.GetBlendShapeIndex(leftName);
+                if (rightIndex < 0 || leftIndex < 0)
+                {
+                    continue;
+                }
+
+                entries.Add(new AdditiveEntryCache
+                {
+                    LeftIndex = leftIndex,
+                    RightIndex = rightIndex,
+                    LeftWeight = data.m_SplitLeftRight ? data.m_LeftWeight : data.m_Weight,
+                    RightWeight = data.m_SplitLeftRight ? data.m_RightWeight : data.m_Weight
+                });
+            }
+
+            return entries.Count == 0 ? Array.Empty<AdditiveEntryCache>() : entries.ToArray();
+        }
+
+        private static IReadOnlyDictionary<string, BlendShapeDefinition> BuildDefinitionLookup(
+            BlendShapeDefinition[] definitions)
+        {
+            if (definitions == null || definitions.Length == 0)
+            {
+                return null;
+            }
+
+            var lookup = new Dictionary<string, BlendShapeDefinition>(definitions.Length, NameComparer);
+            foreach (BlendShapeDefinition definition in definitions)
+            {
+                if (definition == null || string.IsNullOrEmpty(definition.m_BlendShapeName))
+                {
+                    continue;
+                }
+
+                lookup[definition.m_BlendShapeName] = definition;
+            }
+
+            return lookup;
         }
 
         #endregion
@@ -364,21 +589,18 @@ namespace Triturbo.FaceBlendShapeFix
         /// <summary>
         /// Computes which blend shapes need .inv shapes (active non-target shapes)
         /// </summary>
-        private static HashSet<string> ComputeNeededInvShapes(FaceBlendShapeFixComponent component, SkinnedMeshRenderer source)
+        private static HashSet<string> ComputeNeededInvShapes(SkinnedMeshRenderer source)
         {
-            var result = new HashSet<string>();
-            var mesh = source.sharedMesh;
-            if (mesh == null) return result;
-
-            // var targetNames = component?.m_TargetShapes?
-            //     .Select(ts => ts.m_TargetShapeName)
-            //     .ToHashSet() ?? new HashSet<string>();
+            var result = new HashSet<string>(NameComparer);
+            Mesh mesh = source != null ? source.sharedMesh : null;
+            if (mesh == null)
+            {
+                return result;
+            }
 
             for (int i = 0; i < mesh.blendShapeCount; i++)
             {
                 string name = mesh.GetBlendShapeName(i);
-                //if (targetNames.Contains(name)) continue; // Skip target shapes
-
                 if (source.GetBlendShapeWeight(i) > 0f)
                 {
                     result.Add(name);
@@ -392,12 +614,18 @@ namespace Triturbo.FaceBlendShapeFix
         /// </summary>
         private static HashSet<string> ComputeNeededAddShapes(FaceBlendShapeFixComponent component)
         {
-            var result = new HashSet<string>();
-            if (component?.m_TargetShapes == null) return result;
+            var result = new HashSet<string>(NameComparer);
+            if (component?.m_TargetShapes == null)
+            {
+                return result;
+            }
 
             foreach (TargetShape targetShape in component.m_TargetShapes)
             {
-                if (targetShape?.m_AdditiveBlendData == null) continue;
+                if (targetShape?.m_AdditiveBlendData == null)
+                {
+                    continue;
+                }
 
                 foreach (BlendData data in targetShape.m_AdditiveBlendData)
                 {
@@ -410,19 +638,139 @@ namespace Triturbo.FaceBlendShapeFix
             return result;
         }
 
+        private static bool ShapeSetsEqual(HashSet<string> left, HashSet<string> right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null)
+            {
+                return false;
+            }
+
+            return left.SetEquals(right);
+        }
+
+        private static HashSet<string> CloneShapeSet(HashSet<string> source)
+        {
+            return source == null
+                ? new HashSet<string>(NameComparer)
+                : new HashSet<string>(source, NameComparer);
+        }
+
+        private static int ComputeConfigurationSignature(FaceBlendShapeFixComponent component)
+        {
+            unchecked
+            {
+                int hash = 17;
+                AddHash(ref hash, component?.m_TargetShapes?.Length ?? 0);
+
+                if (component?.m_TargetShapes != null)
+                {
+                    foreach (TargetShape targetShape in component.m_TargetShapes)
+                    {
+                        if (targetShape == null)
+                        {
+                            AddHash(ref hash, -1);
+                            continue;
+                        }
+
+                        AddHash(ref hash, targetShape.m_TargetShapeName);
+                        AddHash(ref hash, targetShape.m_Weight);
+                        AddHash(ref hash, targetShape.m_UseGlobalDefinitions);
+                        AddHash(ref hash, (int)targetShape.m_TargetShapeType);
+                        AddHash(ref hash, targetShape.m_BlendData);
+                        AddHash(ref hash, targetShape.m_AdditiveBlendData);
+                    }
+                }
+
+                AddHash(ref hash, component?.m_BlendShapeDefinitions?.Length ?? 0);
+                if (component?.m_BlendShapeDefinitions != null)
+                {
+                    foreach (BlendShapeDefinition definition in component.m_BlendShapeDefinitions)
+                    {
+                        if (definition == null)
+                        {
+                            AddHash(ref hash, -1);
+                            continue;
+                        }
+
+                        AddHash(ref hash, definition.m_BlendShapeName);
+                        AddHash(ref hash, definition.m_LeftEyeWeight);
+                        AddHash(ref hash, definition.m_RightEyeWeight);
+                        AddHash(ref hash, definition.m_MouthWeight);
+                        AddHash(ref hash, definition.m_Protected);
+                    }
+                }
+
+                return hash;
+            }
+        }
+
+        private static void AddHash(ref int hash, BlendData[] blendDataArray)
+        {
+            AddHash(ref hash, blendDataArray?.Length ?? 0);
+            if (blendDataArray == null)
+            {
+                return;
+            }
+
+            foreach (BlendData data in blendDataArray)
+            {
+                if (data == null)
+                {
+                    AddHash(ref hash, -1);
+                    continue;
+                }
+
+                AddHash(ref hash, data.m_TargetShapeName);
+                AddHash(ref hash, data.m_Weight);
+                AddHash(ref hash, data.m_LeftWeight);
+                AddHash(ref hash, data.m_RightWeight);
+                AddHash(ref hash, data.m_SplitLeftRight);
+            }
+        }
+
+        private static void AddHash(ref int hash, string value)
+        {
+            hash = (hash * 31) + (value != null ? NameComparer.GetHashCode(value) : 0);
+        }
+
+        private static void AddHash(ref int hash, float value)
+        {
+            hash = (hash * 31) + value.GetHashCode();
+        }
+
+        private static void AddHash(ref int hash, int value)
+        {
+            hash = (hash * 31) + value;
+        }
+
+        private static void AddHash(ref int hash, bool value)
+        {
+            hash = (hash * 31) + (value ? 1 : 0);
+        }
+
         private void RebuildPreviewMesh(HashSet<string> inverseShapes, HashSet<string> additiveShapes)
         {
-            var mesh = _sourceRenderer.sharedMesh;
-            if (mesh == null) return;
-
+            Mesh mesh = _sourceRenderer.sharedMesh;
             if (_previewData.Mesh != null)
             {
                 Object.DestroyImmediate(_previewData.Mesh);
+                _previewData.Mesh = null;
+            }
+
+            _previewData.InverseShapes = CloneShapeSet(inverseShapes);
+            _previewData.AdditiveShapes = CloneShapeSet(additiveShapes);
+
+            if (mesh == null)
+            {
+                return;
             }
 
             _previewData.Mesh = PreviewMeshBuilder.BuildPreviewMesh(mesh, inverseShapes, additiveShapes, _smoothWidth);
-            _previewData.InverseShapes = inverseShapes;
-            _previewData.AdditiveShapes = additiveShapes;
         }
 
         #endregion
