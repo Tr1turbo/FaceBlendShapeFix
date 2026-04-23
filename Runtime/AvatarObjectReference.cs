@@ -285,7 +285,8 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
             if (_hasCachedResult &&
                 _cachedSequence == HierarchyChangedSequence &&
                 _cachedPath == referencePath &&
-                _cachedSourceTarget == targetObject)
+                ReferenceEquals(_cachedSourceTarget, targetObject) //To prevent Uniy fake null
+                )
             {
                 return _cachedResolvedTarget;
             }

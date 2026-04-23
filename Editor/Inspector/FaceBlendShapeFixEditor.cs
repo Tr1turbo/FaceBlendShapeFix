@@ -283,7 +283,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 return;
             }
             if (component.m_BlendShapeDefinitions != null && 
-                _blendShapeDefinitionDrawer?.HasActiveDefination == true)
+                _blendShapeDefinitionDrawer?.HasActiveDefinition == true)
             {
                 return;
             }

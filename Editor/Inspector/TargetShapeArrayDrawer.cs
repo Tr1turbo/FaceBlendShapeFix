@@ -660,7 +660,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
             if (GUI.Button(setOneRect, SetAllOneContent))
             {
-                ApplyBlendDataWeights(targetShape, blendDataArray, _ => 1f);
+                ApplyBlendDataWeights(targetShape, blendDataArray, _ => 1f, clearSplitLeftRight: true);
             }
 
             if (GUI.Button(setNonZeroOneRect, SetNonZeroOneContent))

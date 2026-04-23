@@ -20,6 +20,8 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         private SerializedProperty definitionsProperty;
         private ReorderableList activeDefinitionList;
 
+        internal bool HasActiveDefinition => activeDefinitionIndices.Count > 0;
+
         public BlendShapeDefinitionDrawer(FaceBlendShapeFixEditor editor)
         {
             this.editor = editor;
@@ -135,7 +137,10 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
         private bool HasValidTargetRenderer()
         {
-            return editor?.component?.TargetRenderer?.sharedMesh != null;
+            // Do not use `editor?.component?.TargetRenderer?.sharedMesh`
+            // Prevent renderer fake null
+            var renderer = editor?.component?.TargetRenderer;
+            return renderer != null && renderer.sharedMesh != null;
         }
 
         private float GetElementHeight(int index)
