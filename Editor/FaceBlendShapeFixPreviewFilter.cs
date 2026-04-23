@@ -147,6 +147,10 @@ namespace Triturbo.FaceBlendShapeFix
         private int _configurationSignature;
 
 
+        private bool _hasPreviewRequest = false;
+
+        private bool _passivePreviewEnabled;
+
         public RenderAspects WhatChanged => RenderAspects.Mesh | RenderAspects.Shapes;
 
 
@@ -156,6 +160,7 @@ namespace Triturbo.FaceBlendShapeFix
         {
             _component = component;
             _sourceRenderer = sourceRenderer;
+            _passivePreviewEnabled = FaceBlendShapeFixPreviewSettings.PassivePreviewEnabled;
         }
 
         public void Dispose()
@@ -184,11 +189,27 @@ namespace Triturbo.FaceBlendShapeFix
             bool meshRebuilt = false;
             bool cacheRebuilt = false;
 
+            
+
+            if(!_hasPreviewRequest && !_passivePreviewEnabled)
+            {
+                if (logEnabled)
+                {
+                    FaceBlendShapeFixPreviewProfiling.RecordRefresh(
+                        Stopwatch.GetTimestamp() - startTicks,
+                        meshRebuilt,
+                        cacheRebuilt);
+                }
+                return Task.FromResult<IRenderFilterNode>(this);
+
+            }
+
             using (RefreshMarker.Auto())
             {
                 // Refresh is the only place where we intentionally do the expensive work:
                 // 1. observe the current preview topology requirements
-                // 2. rebuild the preview mesh if the required split-shape sets changed
+                // 2. rebuild the preview mesh only when the existing preview mesh no longer
+                //    covers the required split-shape sets
                 // 3. rebuild cached target metadata if either the mesh changed or authoring data changed
                 //
                 // This keeps steady-state OnFrame limited to cached numeric indices and one reusable
@@ -197,12 +218,14 @@ namespace Triturbo.FaceBlendShapeFix
                 HashSet<string> neededAddShapes = context.Observe(_component, ComputeNeededAddShapes);
                 int configurationSignature = context.Observe(_component, ComputeConfigurationSignature);
                 float currentSmoothWidth = context.Observe(_component, c => c.m_SmoothWidth);
+                _hasPreviewRequest = _component != null && _component.TryGetPreviewRequest(out _);
+                _passivePreviewEnabled = FaceBlendShapeFixPreviewSettings.PassivePreviewEnabled;
 
                 bool needsMeshRebuild =
                     _previewData.Mesh == null ||
                     (updatedAspects & RenderAspects.Mesh) != 0 ||
-                    !ShapeSetsEqual(neededInvShapes, _previewData.InverseShapes) ||
-                    !ShapeSetsEqual(neededAddShapes, _previewData.AdditiveShapes) ||
+                    !ShapeSetCoversRequired(_previewData.InverseShapes, neededInvShapes) ||
+                    !ShapeSetCoversRequired(_previewData.AdditiveShapes, neededAddShapes) ||
                     Math.Abs(currentSmoothWidth - _smoothWidth) > float.Epsilon;
 
                 _smoothWidth = currentSmoothWidth;
@@ -253,8 +276,8 @@ namespace Triturbo.FaceBlendShapeFix
             long startTicks = logEnabled ? Stopwatch.GetTimestamp() : 0L;
             int appliedTargetCount = 0;
             PreviewRequest previewRequest = default;
-            bool hasPreviewRequest = _component != null && _component.TryGetPreviewRequest(out previewRequest);
-            bool passivePreviewEnabled = FaceBlendShapeFixPreviewSettings.PassivePreviewEnabled;
+            _hasPreviewRequest = _component != null && _component.TryGetPreviewRequest(out previewRequest);
+            _passivePreviewEnabled = FaceBlendShapeFixPreviewSettings.PassivePreviewEnabled;
 
             using (OnFrameMarker.Auto())
             {
@@ -264,17 +287,17 @@ namespace Triturbo.FaceBlendShapeFix
                 string skipShapeName = null;
                 TargetCache previewTargetCache = null;
 
-                if (hasPreviewRequest &&
+                if (_hasPreviewRequest &&
                     TryGetPreviewTargetCache(previewRequest, out previewTargetCache))
                 {
                     skipShapeName = previewTargetCache.TargetName;
                 }
-                else if (hasPreviewRequest && previewRequest.Target != null)
+                else if (_hasPreviewRequest && previewRequest.Target != null)
                 {
                     skipShapeName = previewRequest.Target.m_TargetShapeName;
                 }
 
-                if (hasPreviewRequest || passivePreviewEnabled)
+                if (_hasPreviewRequest || _passivePreviewEnabled)
                 {
                     if (_previewData.Mesh != null)
                     {
@@ -307,7 +330,7 @@ namespace Triturbo.FaceBlendShapeFix
                         }
                     }
 
-                    if (hasPreviewRequest && previewTargetCache != null)
+                    if (_hasPreviewRequest && previewTargetCache != null)
                     {
                         using (ApplyPreviewTargetMarker.Auto())
                         {
@@ -681,19 +704,19 @@ namespace Triturbo.FaceBlendShapeFix
             return result;
         }
 
-        private static bool ShapeSetsEqual(HashSet<string> left, HashSet<string> right)
+        private static bool ShapeSetCoversRequired(HashSet<string> available, HashSet<string> required)
         {
-            if (ReferenceEquals(left, right))
+            if (required == null || required.Count == 0)
             {
                 return true;
             }
 
-            if (left == null || right == null)
+            if (available == null || available.Count < required.Count)
             {
                 return false;
             }
 
-            return left.SetEquals(right);
+            return available.IsSupersetOf(required);
         }
 
         private static HashSet<string> CloneShapeSet(HashSet<string> source)
@@ -816,9 +839,9 @@ namespace Triturbo.FaceBlendShapeFix
                 return;
             }
 
-            // The preview mesh is rebuilt from the full required sets rather than only ever growing.
-            // Using full set equality in Refresh means split shapes can both appear and disappear,
-            // preventing long editor sessions from accumulating stale generated blend shapes.
+            // Rebuilds materialize the currently required generated shapes. Refresh may skip this
+            // work when the existing preview mesh already covers the required names, which keeps
+            // shrinking requirement sets from forcing immediate mesh churn.
             _previewData.Mesh = PreviewMeshBuilder.BuildPreviewMesh(mesh, inverseShapes, additiveShapes, _smoothWidth);
         }
 

@@ -31,7 +31,7 @@ namespace Triturbo.FaceBlendShapeFix
             Menu.SetChecked(MenuPath, s_enabled);
         }
 
-        [MenuItem(MenuPath, false, 2000)]
+        //[MenuItem(MenuPath, false, 2000)]
         private static void ToggleLogging()
         {
             s_enabled = !s_enabled;
@@ -44,7 +44,7 @@ namespace Triturbo.FaceBlendShapeFix
                 " Use the Unity Profiler for precise timing; logs are aggregated over 120 frames.");
         }
 
-        [MenuItem(MenuPath, true)]
+        //[MenuItem(MenuPath, true)]
         private static bool ToggleLoggingValidate()
         {
             Menu.SetChecked(MenuPath, s_enabled);
