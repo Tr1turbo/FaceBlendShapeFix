@@ -14,7 +14,6 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
     [CustomPropertyDrawer(typeof(AvatarObjectReference), true)]
     internal class AvatarObjectReferenceDrawer : PropertyDrawer
     {
-        private bool? _isPartOfPrefabAsset;
         private static readonly Dictionary<Type, Type> s_AcceptedTypeCache = new();
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
@@ -26,21 +25,17 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 SerializedProperty targetObjectProperty = property.FindPropertyRelative("targetObject");
                 Type acceptedType = GetAcceptedObjectType();
 
-                if(!_isPartOfPrefabAsset.HasValue) 
-                { 
-                    _isPartOfPrefabAsset = IsInPrefabAsset(property);
-                }
-                bool isInPrefabStage = _isPartOfPrefabAsset.Value;
-
                 if (referencePathProperty == null || targetObjectProperty == null)
                 {
                     EditorGUI.LabelField(position, label, GUIContent.none);
                     return;
                 }
 
-                Transform avatarRoot = FindContainingAvatarTransform(property);
+                Transform avatarRoot = AvatarObjectReference.FindContainingAvatarTransform(property);
+                bool isPrefabAsset = AvatarObjectReference.IsInPrefabAsset(property);
+                bool isInPrefabMode = AvatarObjectReference.IsInPrefabMode(property);
 
-                if (isInPrefabStage)
+                if (isPrefabAsset)
                 {
                     EditorGUI.BeginDisabledGroup(true);
                     string displayText = GetReadOnlyDisplayText(referencePathProperty, targetObjectProperty) + $" ({GetTypeDisplayName(acceptedType)})";;
@@ -49,8 +44,13 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     return;
                 }
 
-                Object currentObject = ResolveCurrentObject(property, targetObjectProperty, acceptedType);
-                bool showMissingPath = currentObject == null && !string.IsNullOrEmpty(referencePathProperty.stringValue);
+                AvatarObjectReference.InspectorState inspectorState = AvatarObjectReference.GetInspectorState(
+                    property,
+                    acceptedType,
+                    allowPathRepair: !isInPrefabMode
+                );
+                Object currentObject = inspectorState.CurrentObject;
+                bool showMissingPath = inspectorState.ShowMissingPath;
 
                 Color contentColor = GUI.contentColor;
                 Rect fieldRect = position;
@@ -63,7 +63,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     if (showMissingPath)
                     {
                         string field = referencePathProperty.stringValue + $" ({GetTypeDisplayName(acceptedType)})";
-                        if (DrawFakeField(acceptedType, position, label, Color.red, field, out var newObject))
+                        if (DrawFakeField(acceptedType, position, label, isInPrefabMode ? Color.white : Color.red, field, out var newObject))
                         {
                             ApplySelection(avatarRoot, referencePathProperty, targetObjectProperty, newObject);
                         }
@@ -242,37 +242,6 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             return typeof(GameObject);
         }
 
-        private static Object ResolveCurrentObject(
-            SerializedProperty property,
-            SerializedProperty targetObjectProperty,
-            Type acceptedType)
-        {
-            GameObject currentTarget = AvatarObjectReference.Get(property);
-            if (currentTarget != null)
-            {
-                if (acceptedType == typeof(GameObject))
-                {
-                    return currentTarget;
-                }
-
-                return currentTarget.GetComponent(acceptedType);
-            }
-
-            SerializedProperty referencePathProperty = property.FindPropertyRelative("referencePath");
-            if (referencePathProperty != null && !string.IsNullOrEmpty(referencePathProperty.stringValue))
-            {
-                return null;
-            }
-
-            Object directTarget = targetObjectProperty.objectReferenceValue;
-            if (directTarget != null && acceptedType.IsInstanceOfType(directTarget))
-            {
-                return directTarget;
-            }
-
-            return null;
-        }
-
         private static void ApplySelection(
             Transform avatarRoot,
             SerializedProperty referencePathProperty,
@@ -325,64 +294,6 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             }
 
             return null;
-        }
-
-        private static Transform FindContainingAvatarTransform(SerializedProperty property)
-        {
-            if (property.serializedObject == null)
-            {
-                return null;
-            }
-
-            Transform sharedAvatarRoot = null;
-            foreach (Object target in property.serializedObject.targetObjects)
-            {
-                Transform targetTransform =
-                    (target as Component)?.transform ??
-                    (target as GameObject)?.transform;
-
-                Transform avatarRoot = AvatarHierarchyUtil.FindAvatarInParents(targetTransform);
-                if (avatarRoot == null)
-                {
-                    return null;
-                }
-
-                if (sharedAvatarRoot == null)
-                {
-                    sharedAvatarRoot = avatarRoot;
-                    continue;
-                }
-
-                if (sharedAvatarRoot != avatarRoot)
-                {
-                    return null;
-                }
-            }
-
-            return sharedAvatarRoot;
-        }
-
-        private static bool IsInPrefabAsset(SerializedProperty property)
-        {
-            if (property?.serializedObject == null)
-            {
-                return false;
-            }
-
-
-            foreach (Object target in property.serializedObject.targetObjects)
-            {
-                GameObject gameObject =
-                    (target as Component)?.gameObject ??
-                    target as GameObject;
-
-                if (gameObject == null || !PrefabUtility.IsPartOfPrefabAsset(gameObject))
-                {
-                    return false;
-                }
-            }
-
-            return property.serializedObject.targetObjects.Length > 0;
         }
     }
 }

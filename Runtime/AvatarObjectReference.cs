@@ -5,9 +5,15 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 #if UNITY_EDITOR
 using UnityEditor;
+#if UNITY_2021_2_OR_NEWER
+using UnityEditor.SceneManagement;
+#else
+using UnityEditor.Experimental.SceneManagement;
+#endif
 #endif
 
 namespace Triturbo.FaceBlendShapeFix.Runtime
@@ -169,6 +175,18 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
         public string referencePath;
 
 #if UNITY_EDITOR
+        public readonly struct InspectorState
+        {
+            public Object CurrentObject { get; }
+            public bool ShowMissingPath { get; }
+
+            public InspectorState(Object currentObject, bool showMissingPath)
+            {
+                CurrentObject = currentObject;
+                ShowMissingPath = showMissingPath;
+            }
+        }
+
         [InitializeOnLoadMethod]
         private static void Initialize()
         {
@@ -206,18 +224,214 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
                 ? targetObjectProperty.objectReferenceValue as Component
                 : null;
 
-            Transform resolvedTransform = ResolveReferenceTransform(avatarRoot, path);
-            if (resolvedTransform != null || !string.IsNullOrEmpty(path))
-            {
-                return resolvedTransform != null ? resolvedTransform.gameObject : null;
-            }
-
             if (IsValidTarget(directTarget, avatarRoot))
             {
                 return directTarget.gameObject;
             }
 
+            Transform resolvedTransform = ResolveReferenceTransform(avatarRoot, path);
+            if (resolvedTransform != null)
+            {
+                return resolvedTransform.gameObject;
+            }
+
             return null;
+        }
+
+        public static InspectorState GetInspectorState(
+            SerializedProperty property,
+            Type acceptedType,
+            bool allowPathRepair)
+        {
+            if (property?.serializedObject == null || acceptedType == null)
+            {
+                return default;
+            }
+
+            SerializedProperty referencePathProperty = property.FindPropertyRelative("referencePath");
+            SerializedProperty targetObjectProperty = property.FindPropertyRelative("targetObject");
+            if (referencePathProperty == null || targetObjectProperty == null)
+            {
+                return default;
+            }
+
+            Transform avatarRoot = FindContainingAvatarTransform(property);
+            Object currentObject = ResolveInspectorObject(
+                avatarRoot,
+                referencePathProperty,
+                targetObjectProperty,
+                acceptedType,
+                allowPathRepair
+            );
+
+            return new InspectorState(
+                currentObject,
+                currentObject == null && !string.IsNullOrEmpty(referencePathProperty.stringValue)
+            );
+        }
+
+        public static Transform FindContainingAvatarTransform(SerializedProperty property)
+        {
+            if (property?.serializedObject == null)
+            {
+                return null;
+            }
+
+            Transform sharedAvatarRoot = null;
+            foreach (Object target in property.serializedObject.targetObjects)
+            {
+                Transform targetTransform =
+                    (target as Component)?.transform ??
+                    (target as GameObject)?.transform;
+
+                Transform avatarRoot = AvatarHierarchyUtil.FindAvatarInParents(targetTransform);
+                if (avatarRoot == null)
+                {
+                    return null;
+                }
+
+                if (sharedAvatarRoot == null)
+                {
+                    sharedAvatarRoot = avatarRoot;
+                    continue;
+                }
+
+                if (sharedAvatarRoot != avatarRoot)
+                {
+                    return null;
+                }
+            }
+
+            return sharedAvatarRoot;
+        }
+
+        public static bool IsInPrefabAsset(SerializedProperty property)
+        {
+            if (property?.serializedObject == null)
+            {
+                return false;
+            }
+
+            foreach (Object target in property.serializedObject.targetObjects)
+            {
+                GameObject gameObject =
+                    (target as Component)?.gameObject ??
+                    target as GameObject;
+
+                if (gameObject == null || !PrefabUtility.IsPartOfPrefabAsset(gameObject))
+                {
+                    return false;
+                }
+            }
+
+            return property.serializedObject.targetObjects.Length > 0;
+        }
+
+        public static bool IsInPrefabMode(SerializedProperty property)
+        {
+            if (property?.serializedObject == null)
+            {
+                return false;
+            }
+
+            PrefabStage currentPrefabStage = PrefabStageUtility.GetCurrentPrefabStage();
+            foreach (Object target in property.serializedObject.targetObjects)
+            {
+                GameObject gameObject =
+                    (target as Component)?.gameObject ??
+                    target as GameObject;
+
+                if (gameObject == null)
+                {
+                    return false;
+                }
+
+                if (PrefabUtility.IsPartOfPrefabAsset(gameObject))
+                {
+                    continue;
+                }
+
+                if (currentPrefabStage != null && PrefabStageUtility.GetPrefabStage(gameObject) == currentPrefabStage)
+                {
+                    continue;
+                }
+
+                return false;
+            }
+
+            return property.serializedObject.targetObjects.Length > 0;
+        }
+
+        private static Object ResolveInspectorObject(
+            Transform avatarRoot,
+            SerializedProperty referencePathProperty,
+            SerializedProperty targetObjectProperty,
+            Type acceptedType,
+            bool allowPathRepair)
+        {
+            string referencePath = referencePathProperty?.stringValue ?? string.Empty;
+            Object pathTarget = ResolvePathTarget(avatarRoot, referencePath, acceptedType);
+            Object directTarget = GetTypedTarget(targetObjectProperty, acceptedType);
+            bool directTargetValid = IsTargetUnderAvatarRoot(directTarget, avatarRoot);
+
+            if (directTargetValid)
+            {
+                if (allowPathRepair)
+                {
+                    string normalizedPath = GetRelativePath(avatarRoot, directTarget);
+                    if (!string.Equals(referencePath, normalizedPath, StringComparison.Ordinal))
+                    {
+                        referencePathProperty.stringValue = normalizedPath;
+                    }
+                }
+
+                return directTarget;
+            }
+
+            if (pathTarget != null)
+            {
+                targetObjectProperty.objectReferenceValue = pathTarget;
+                return pathTarget;
+            }
+
+            if (!string.IsNullOrEmpty(referencePath))
+            {
+                return null;
+            }
+
+            return directTarget;
+        }
+
+        private static Object ResolvePathTarget(Transform avatarRoot, string referencePath, Type acceptedType)
+        {
+            if (avatarRoot == null || string.IsNullOrEmpty(referencePath))
+            {
+                return null;
+            }
+
+            Transform targetTransform = referencePath == AvatarRoot
+                ? avatarRoot
+                : avatarRoot.Find(referencePath);
+
+            if (targetTransform == null)
+            {
+                return null;
+            }
+
+            if (acceptedType == typeof(GameObject))
+            {
+                return targetTransform.gameObject;
+            }
+
+            return targetTransform.GetComponent(acceptedType);
+        }
+
+        private static Object GetTypedTarget(SerializedProperty targetObjectProperty, Type acceptedType)
+        {
+            Object directTarget = targetObjectProperty?.objectReferenceValue;
+            return directTarget != null && acceptedType.IsInstanceOfType(directTarget)
+                ? directTarget
+                : null;
         }
 #endif
 
@@ -256,6 +470,48 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
                    avatarRoot != null &&
                    (candidate.transform == avatarRoot || candidate.transform.IsChildOf(avatarRoot));
         }
+
+#if UNITY_EDITOR
+        private static bool IsTargetUnderAvatarRoot(Object targetObject, Transform avatarRoot)
+        {
+            if (targetObject == null || avatarRoot == null)
+            {
+                return false;
+            }
+
+            GameObject targetGameObject = ExtractGameObject(targetObject);
+            return targetGameObject != null &&
+                   (targetGameObject.transform == avatarRoot || targetGameObject.transform.IsChildOf(avatarRoot));
+        }
+
+        private static string GetRelativePath(Transform avatarRoot, Object targetObject)
+        {
+            GameObject targetGameObject = ExtractGameObject(targetObject);
+            if (avatarRoot == null || targetGameObject == null)
+            {
+                return string.Empty;
+            }
+
+            return targetGameObject.transform == avatarRoot
+                ? AvatarRoot
+                : AvatarHierarchyUtil.RelativePath(avatarRoot, targetGameObject.transform) ?? string.Empty;
+        }
+
+        private static GameObject ExtractGameObject(Object targetObject)
+        {
+            if (targetObject is GameObject gameObject)
+            {
+                return gameObject;
+            }
+
+            if (targetObject is Component component)
+            {
+                return component.gameObject;
+            }
+
+            return null;
+        }
+#endif
     }
 
     [Serializable]
@@ -303,15 +559,6 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
             }
 
             Transform avatarRoot = AvatarHierarchyUtil.FindAvatarInParents(container.transform);
-            if (!string.IsNullOrEmpty(referencePath))
-            {
-                Transform targetTransform = ResolveReferenceTransform(avatarRoot, referencePath);
-                _cachedResolvedTarget = targetTransform != null
-                    ? targetTransform.GetComponent<T>()
-                    : null;
-                return _cachedResolvedTarget;
-            }
-
             if (avatarRoot == null)
             {
                 _cachedResolvedTarget = targetObject;
@@ -322,6 +569,19 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
             {
                 _cachedResolvedTarget = targetObject;
                 return _cachedResolvedTarget;
+            }
+
+            if (!string.IsNullOrEmpty(referencePath))
+            {
+                Transform targetTransform = ResolveReferenceTransform(avatarRoot, referencePath);
+                if (targetTransform != null)
+                {
+                    _cachedResolvedTarget = targetTransform.GetComponent<T>();
+                    if (_cachedResolvedTarget != null)
+                    {
+                        return _cachedResolvedTarget;
+                    }
+                }
             }
 
             _cachedResolvedTarget = null;
