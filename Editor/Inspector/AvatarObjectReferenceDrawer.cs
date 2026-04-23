@@ -14,17 +14,23 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
     [CustomPropertyDrawer(typeof(AvatarObjectReference), true)]
     internal class AvatarObjectReferenceDrawer : PropertyDrawer
     {
+        private bool? _isPartOfPrefabAsset;
         private static readonly Dictionary<Type, Type> s_AcceptedTypeCache = new();
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             label = EditorGUI.BeginProperty(position, label, property);
-
             try
             {
                 SerializedProperty referencePathProperty = property.FindPropertyRelative("referencePath");
                 SerializedProperty targetObjectProperty = property.FindPropertyRelative("targetObject");
                 Type acceptedType = GetAcceptedObjectType();
+
+                if(!_isPartOfPrefabAsset.HasValue) 
+                { 
+                    _isPartOfPrefabAsset = IsInPrefabAsset(property);
+                }
+                bool isInPrefabStage = _isPartOfPrefabAsset.Value;
 
                 if (referencePathProperty == null || targetObjectProperty == null)
                 {
@@ -33,7 +39,6 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 }
 
                 Transform avatarRoot = FindContainingAvatarTransform(property);
-                bool isInPrefabStage = IsInPrefabAsset(property);
 
                 if (isInPrefabStage)
                 {
@@ -108,27 +113,30 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
             GUI.contentColor = textColor;
 
-
-            var icon = GetTypeIconContent(acceptedType);
-
-            // Icon rect
-            Rect iconRect = fieldRect;
-            iconRect.width = 18;
-            iconRect.height = 18;
-            iconRect.y += (fieldRect.height - 18) * 0.5f; // vertical center
-            // Text rect (shift right)
-            Rect textRect = fieldRect;
-            textRect.x += 16;
-
-
-
-            // Draw icon
-            if (icon?.image != null)
+            if(position.width > 152)
             {
-                GUI.Label(iconRect, icon);
+                var icon = GetTypeIconContent(acceptedType);
+                // Icon rect
+                Rect iconRect = fieldRect;
+                iconRect.width = 18;
+                iconRect.height = 18;
+
+                iconRect.y += (fieldRect.height - 18) * 0.5f; // vertical center
+                
+                // Text rect (shift right)
+                Rect textRect = fieldRect;
+                textRect.x += 16;
+                textRect.width = position.width - labelWidth - 36;
+
+                // Draw icon
+                if (icon?.image != null)
+                {
+                    GUI.Label(iconRect, icon);
+                }
+
+                EditorGUI.LabelField(textRect, text);  
             }
 
-            EditorGUI.LabelField(textRect, text);
             EditorGUI.indentLevel = oldIndentLevel;
 
 
