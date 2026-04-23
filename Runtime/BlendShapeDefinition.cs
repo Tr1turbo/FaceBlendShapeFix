@@ -7,9 +7,9 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
     public class BlendShapeDefinition
     {
         public string m_BlendShapeName;
-        public float m_LeftEyeWeight;
-        public float m_RightEyeWeight;
-        public float m_MouthWeight;
+        [Range(0f, 1f)] public float m_LeftEyeWeight;
+        [Range(0f, 1f)] public float m_RightEyeWeight;
+        [Range(0f, 1f)] public float m_MouthWeight;
         public bool m_Protected;
 
         public BlendData ResolveBlendData(ShapeType targetShapeType)
