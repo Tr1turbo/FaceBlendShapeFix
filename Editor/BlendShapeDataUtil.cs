@@ -279,6 +279,40 @@ namespace Triturbo.FaceBlendShapeFix
                 m_SplitLeftRight = !Approximately(left, right, 0.1f)
             };
         }
+
+        internal static BlendData CreateZeroBlendData(Mesh mesh, int targetShapeIndex)
+        {
+            if (mesh == null ||
+                targetShapeIndex < 0 ||
+                targetShapeIndex >= mesh.blendShapeCount)
+            {
+                return null;
+            }
+
+            return new BlendData
+            {
+                m_TargetShapeName = mesh.GetBlendShapeName(targetShapeIndex),
+                m_Weight = 0f,
+                m_LeftWeight = 0f,
+                m_RightWeight = 0f,
+                m_SplitLeftRight = false
+            };
+        }
+
+        internal static BlendData CreateDefaultBlendData(
+            SkinnedMeshRenderer smr,
+            int mainShapeIndex,
+            int targetShapeIndex,
+            float mainWeight,
+            NewActiveBlendShapeWeightMode creationMode)
+        {
+            if (creationMode == NewActiveBlendShapeWeightMode.Zero)
+            {
+                return CreateZeroBlendData(smr?.sharedMesh, targetShapeIndex);
+            }
+
+            return CreateBlendData(smr, mainShapeIndex, targetShapeIndex, mainWeight);
+        }
         
         
         // internal static BlendShapeDefinition CreateDefinition(SkinnedMeshRenderer smr, int shapeIndex, 
@@ -325,9 +359,51 @@ namespace Triturbo.FaceBlendShapeFix
                 m_MouthWeight = ThresholdMap(scoreMouth)
             };
         }
+
+        internal static BlendShapeDefinition CreateZeroDefinition(Mesh mesh, int shapeIndex)
+        {
+            if (mesh == null ||
+                shapeIndex < 0 ||
+                shapeIndex >= mesh.blendShapeCount)
+            {
+                return null;
+            }
+
+            return new BlendShapeDefinition
+            {
+                m_BlendShapeName = mesh.GetBlendShapeName(shapeIndex),
+                m_LeftEyeWeight = 0f,
+                m_RightEyeWeight = 0f,
+                m_MouthWeight = 0f
+            };
+        }
+
+        internal static BlendShapeDefinition CreateDefaultDefinition(
+            SkinnedMeshRenderer smr,
+            int shapeIndex,
+            IReadOnlyList<int> eyeReferenceIndices,
+            IReadOnlyList<int> mouthReferenceIndices,
+            BlendShapeComparisonMode comparisonMode,
+            NewActiveBlendShapeWeightMode creationMode)
+        {
+            if (creationMode == NewActiveBlendShapeWeightMode.Zero)
+            {
+                return CreateZeroDefinition(smr?.sharedMesh, shapeIndex);
+            }
+
+            return CreateDefinition(
+                smr,
+                shapeIndex,
+                eyeReferenceIndices,
+                mouthReferenceIndices,
+                comparisonMode);
+        }
         
         
-        internal static bool EnsureBlendDataForActiveShapes(FaceBlendShapeFixComponent component, IReadOnlyCollection<string> newActiveBlendShapes)
+        internal static bool EnsureBlendDataForActiveShapes(
+            FaceBlendShapeFixComponent component,
+            IReadOnlyCollection<string> newActiveBlendShapes,
+            NewActiveBlendShapeWeightMode creationMode)
         {
             if (component == null || component.TargetRenderer == null || component.TargetRenderer.sharedMesh == null)
                 return false;
@@ -341,7 +417,7 @@ namespace Triturbo.FaceBlendShapeFix
             
             foreach (var targetShape in component.m_TargetShapes ?? Enumerable.Empty<TargetShape>())
             {
-                addedBlendData |= EnsureBlendDataForActiveShapes(targetShape, newActiveBlendShapes, smr);
+                addedBlendData |= EnsureBlendDataForActiveShapes(targetShape, newActiveBlendShapes, smr, creationMode);
             }
 
             if (addedBlendData)
@@ -352,7 +428,11 @@ namespace Triturbo.FaceBlendShapeFix
         }
         
         
-        internal static bool EnsureBlendDataForActiveShapes(TargetShape targetShape, IReadOnlyCollection<string> newActiveBlendShapes, SkinnedMeshRenderer smr)
+        internal static bool EnsureBlendDataForActiveShapes(
+            TargetShape targetShape,
+            IReadOnlyCollection<string> newActiveBlendShapes,
+            SkinnedMeshRenderer smr,
+            NewActiveBlendShapeWeightMode creationMode)
         {
             var mesh = smr.sharedMesh;
 
@@ -377,7 +457,12 @@ namespace Triturbo.FaceBlendShapeFix
                     continue;
                 }
 
-                var blendData = CreateBlendData(smr, mainShapeIndex, targetBlendShapeIndex, targetShape.m_Weight);
+                var blendData = CreateDefaultBlendData(
+                    smr,
+                    mainShapeIndex,
+                    targetBlendShapeIndex,
+                    targetShape.m_Weight,
+                    creationMode);
                 if (blendData == null)
                 {
                     continue;

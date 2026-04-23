@@ -8,6 +8,12 @@ using VRC.SDKBase;
 
 namespace Triturbo.FaceBlendShapeFix.Runtime
 {
+    public enum NewActiveBlendShapeWeightMode
+    {
+        Zero = 0,
+        AutoCalculate = 1
+    }
+
     [AddComponentMenu("Triturbo/Face BlendShape Fix")]
     public class FaceBlendShapeFixComponent : MonoBehaviour
 #if FBF_VRCSDK_BASE
@@ -58,8 +64,8 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
         [Range(0f, 0.1f)]
         public float m_SmoothWidth = 0f;
 
-
-        public InspectorSettings m_InspectorSettings;
+        public NewActiveBlendShapeWeightMode m_NewActiveBlendShapeWeightMode =
+            NewActiveBlendShapeWeightMode.AutoCalculate;
 
         private void Reset()
         {
@@ -164,12 +170,5 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
             _targetIndex = targetIndex;
             Weight = weight;
         }
-    }
-
-    [Serializable]
-    public class InspectorSettings
-    {
-        public bool m_EnableBlendDataScroll = true;
-        public float m_BlendDataScrollHeight = 240f;
     }
 }

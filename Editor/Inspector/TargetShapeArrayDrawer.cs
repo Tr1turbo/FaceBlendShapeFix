@@ -384,8 +384,8 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     }
                     else
                     {
-                        bool allowScroll = _component?.m_InspectorSettings?.m_EnableBlendDataScroll ?? true;
-                        float scrollHeight = Mathf.Max(64f, _component?.m_InspectorSettings?.m_BlendDataScrollHeight ?? 240f);
+                        bool allowScroll = FaceBlendShapeFixEditorSettings.BlendDataScrollEnabled;
+                        float scrollHeight = FaceBlendShapeFixEditorSettings.BlendDataScrollHeight;
                         bool useScroll = allowScroll && blendDataVisibility._listHeight > scrollHeight;
                         string scrollKey = targetShapeProp.propertyPath;
                         bool isUpdated = false;

@@ -2,6 +2,8 @@
     "language.name": "日本語",
 
     "editor.settings": "設定",
+    "editor.component_settings": "コンポーネント設定",
+    "editor.global_editor_settings": "エディター設定",
     "editor.smooth_width": "スムース幅",
     "editor.smooth_width.tooltip": "左右ブレンドシェイプ分割のトランジションゾーンの幅。0 = 中央でハードカット。",
     "editor.target_renderer": "ターゲットレンダラー",
@@ -44,6 +46,12 @@
     "editor.preview.exit": "プレビュー終了",
     "editor.preview.passive_preview": "パッシブプレビュー",
     "editor.preview.passive_preview.tooltip": "グローバルなエディター設定です。有効な場合、Preview を押さなくてもターゲットレンダラーの現在のシェイプキー値に追従してプレビューします。無効にすると、プレビューボタンまたはスライダー操作時のみプレビューします。",
+    "editor.blend_data_scroll_enabled": "Blend Data スクロール",
+    "editor.blend_data_scroll_enabled.tooltip": "グローバルなエディター設定です。有効にすると、長い Blend Data リストをスクロール領域内に表示します。",
+    "editor.blend_data_scroll_height": "Blend Data スクロール高さ",
+    "editor.blend_data_scroll_height.tooltip": "グローバルなエディター設定です。Blend Data のスクロール領域に使うピクセル高さです。",
+    "editor.new_active_blendshape_weight_mode": "アクティブなシェイプキーを自動追加するとき",
+    "editor.new_active_blendshape_weight_mode.tooltip": "不足しているローカル Blend Data またはグローバル定義が自動作成されるときにのみ適用されます。既存の値は変更されません。",
 
     "editor.main_weight": "メインウェイト",
     "editor.main_weight.tooltip": "この修正対象シェイプキー自体に適用されるウェイト。",
@@ -93,6 +101,8 @@
     "enum.shapetype.right_eye": "右目",
     "enum.shapetype.mouth": "口",
     "enum.shapetype.others": "その他",
+    "enum.new_active_blendshape_weight_mode.zero": "0 で初期化",
+    "enum.new_active_blendshape_weight_mode.auto_calculate": "自動計算",
 
     "editor.create_new_category": "+ 新しいカテゴリを作成",
     "editor.dialog.create_category.title": "新しいカテゴリを作成",

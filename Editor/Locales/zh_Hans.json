@@ -2,6 +2,8 @@
     "language.name": "简体中文",
 
     "editor.settings": "设置",
+    "editor.component_settings": "组件设置",
+    "editor.global_editor_settings": "编辑器设置",
     "editor.smooth_width": "平滑宽度",
     "editor.smooth_width.tooltip": "左右形态键分割过渡区域的宽度。0 = 中心硬切割。",
     "editor.target_renderer": "目标渲染器",
@@ -44,6 +46,12 @@
     "editor.preview.exit": "退出预览",
     "editor.preview.passive_preview": "被动预览",
     "editor.preview.passive_preview.tooltip": "全局编辑器设置。启用时，即使不按下预览，也会根据目标渲染器当前的形态键权重显示预览。禁用后，只有使用预览按钮或滑块时才会预览。",
+    "editor.blend_data_scroll_enabled": "Blend Data 滚动",
+    "editor.blend_data_scroll_enabled.tooltip": "全局编辑器设置。启用后，较长的 Blend Data 列表会显示在可滚动区域中。",
+    "editor.blend_data_scroll_height": "Blend Data 滚动高度",
+    "editor.blend_data_scroll_height.tooltip": "全局编辑器设置。Blend Data 滚动区域使用的像素高度。",
+    "editor.new_active_blendshape_weight_mode": "自动添加活动形态键时",
+    "editor.new_active_blendshape_weight_mode.tooltip": "仅在缺失的本地 Blend Data 或全局定义被自动创建时生效。现有值不会改变。",
 
     "editor.main_weight": "主权重",
     "editor.main_weight.tooltip": "应用于此修复目标形态键本身的权重。",
@@ -93,6 +101,8 @@
     "enum.shapetype.right_eye": "右眼",
     "enum.shapetype.mouth": "嘴部",
     "enum.shapetype.others": "其他",
+    "enum.new_active_blendshape_weight_mode.zero": "初始化为 0",
+    "enum.new_active_blendshape_weight_mode.auto_calculate": "自动计算",
 
     "editor.create_new_category": "+ 创建新分类",
     "editor.dialog.create_category.title": "创建新分类",

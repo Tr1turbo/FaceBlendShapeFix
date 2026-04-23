@@ -160,7 +160,7 @@ namespace Triturbo.FaceBlendShapeFix
         {
             _component = component;
             _sourceRenderer = sourceRenderer;
-            _passivePreviewEnabled = FaceBlendShapeFixPreviewSettings.PassivePreviewEnabled;
+            _passivePreviewEnabled = FaceBlendShapeFixEditorSettings.PassivePreviewEnabled;
         }
 
         public void Dispose()
@@ -219,7 +219,7 @@ namespace Triturbo.FaceBlendShapeFix
                 int configurationSignature = context.Observe(_component, ComputeConfigurationSignature);
                 float currentSmoothWidth = context.Observe(_component, c => c.m_SmoothWidth);
                 _hasPreviewRequest = _component != null && _component.TryGetPreviewRequest(out _);
-                _passivePreviewEnabled = FaceBlendShapeFixPreviewSettings.PassivePreviewEnabled;
+                _passivePreviewEnabled = FaceBlendShapeFixEditorSettings.PassivePreviewEnabled;
 
                 bool needsMeshRebuild =
                     _previewData.Mesh == null ||
@@ -277,7 +277,7 @@ namespace Triturbo.FaceBlendShapeFix
             int appliedTargetCount = 0;
             PreviewRequest previewRequest = default;
             _hasPreviewRequest = _component != null && _component.TryGetPreviewRequest(out previewRequest);
-            _passivePreviewEnabled = FaceBlendShapeFixPreviewSettings.PassivePreviewEnabled;
+            _passivePreviewEnabled = FaceBlendShapeFixEditorSettings.PassivePreviewEnabled;
 
             using (OnFrameMarker.Auto())
             {
