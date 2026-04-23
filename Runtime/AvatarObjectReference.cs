@@ -339,16 +339,4 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
             _hasCachedResult = true;
         }
     }
-
-    // [Serializable]
-    // public sealed class AvatarSkinnedMeshRendererReference : AvatarObjectReference<SkinnedMeshRenderer>
-    // {
-    //     public AvatarSkinnedMeshRendererReference()
-    //     {
-    //     }
-
-    //     public AvatarSkinnedMeshRendererReference(SkinnedMeshRenderer target) : base(target)
-    //     {
-    //     }
-    // }
 }

@@ -32,7 +32,12 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
                     return m_TargetRendererReference.Get(this);
                 }
 
-                return transform.GetComponent<SkinnedMeshRenderer>();
+                if (transform.TryGetComponent<SkinnedMeshRenderer>(out var smr))
+                {
+                    return smr;
+                }
+
+                return null;
             }
         }
 
@@ -63,12 +68,13 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
             m_CategoryDatabases = new[] { m_CategoryDatabase };
         }
 
+#if UNITY_EDITOR
         private void OnValidate()
         {
             EnsureTargetRendererReferenceInitialized();
             MigrateLegacyTargetRendererIfNeeded();
         }
-
+#endif
         private AvatarObjectReference<SkinnedMeshRenderer> EnsureTargetRendererReferenceInitialized()
         {
             if (m_TargetRendererReference == null)
