@@ -86,18 +86,16 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         public void Refresh()
         {
             if (_renderer == null || _renderer.sharedMesh == null)
+            {
+                ClearCurrentActive();
+                NotifyIfChanged();
                 return;
-            
+            }
+
             UpdateCurrentActive();
-            
-            if (!HasChanged())
-                return;
-            
-            var change = ComputeChange();
-            
-            OnActiveBlendShapesChanged?.Invoke(change);
+            NotifyIfChanged();
         }
-        
+
         private void UpdateCurrentActive()
         {
             _currentWeights.Clear();
@@ -117,7 +115,24 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 _currentActive.Add(name);
             }
         }
-        
+
+        private void ClearCurrentActive()
+        {
+            _currentWeights.Clear();
+            _currentActive.Clear();
+        }
+
+        private void NotifyIfChanged()
+        {
+            if (!HasChanged())
+            {
+                return;
+            }
+
+            BlendShapeChange change = ComputeChange();
+            OnActiveBlendShapesChanged?.Invoke(change);
+        }
+
         
         private bool HasChanged()
         {

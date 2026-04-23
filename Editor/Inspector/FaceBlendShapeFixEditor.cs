@@ -110,10 +110,8 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 _targetShapeArrayDrawer.OnActiveBlendShapesChanged(change.Active);
                 Repaint();
             };
-            
-            _targetShapeArrayDrawer.OnActiveBlendShapesChanged(_blendShapeActivationObserver.ActiveShapes);
-            EnsureBlendDataForActiveShapes(_blendShapeActivationObserver.ActiveShapes);
-            EnsureBlendShapeDefinitionsForActiveShapes(_blendShapeActivationObserver.ActiveShapes);
+
+            SyncTargetRendererObserver(forceRefresh: true);
 
             blendShapeDefinitionDrawer.Initialize(blendShapeDefinitionsProp);
             component.m_BlendShapeDefinitions ??= Array.Empty<BlendShapeDefinition>();
@@ -169,6 +167,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             L.DrawLanguagePopup(L.Get("editor.language"));
             
             serializedObject.Update();
+            SyncTargetRendererObserver();
             UpdateCategoryCaches();
             
             Debug.Assert(_blendShapeActivationObserver != null);
@@ -205,6 +204,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                         {
                             serializedObject.ApplyModifiedProperties();
                             serializedObject.Update();
+                            SyncTargetRendererObserver(forceRefresh: true);
                         }
 
                         EditorGUILayout.PropertyField(smoothWidthProp, L.G("editor.smooth_width"));
@@ -245,6 +245,35 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     serializedObject.Update();
                 }
             }
+        }
+
+        private void SyncTargetRendererObserver(bool forceRefresh = false)
+        {
+            if (_blendShapeActivationObserver == null)
+            {
+                return;
+            }
+
+            SkinnedMeshRenderer currentRenderer = component?.TargetRenderer;
+            bool rendererChanged = _blendShapeActivationObserver.Renderer != currentRenderer;
+            if (rendererChanged)
+            {
+                _blendShapeActivationObserver.Renderer = currentRenderer;
+            }
+
+            if (!forceRefresh && !rendererChanged)
+            {
+                return;
+            }
+
+            if (forceRefresh)
+            {
+                _blendShapeActivationObserver.Refresh();
+            }
+
+            _targetShapeArrayDrawer?.OnActiveBlendShapesChanged(_blendShapeActivationObserver.ActiveShapes);
+            EnsureBlendDataForActiveShapes(_blendShapeActivationObserver.ActiveShapes);
+            EnsureBlendShapeDefinitionsForActiveShapes(_blendShapeActivationObserver.ActiveShapes);
         }
 
         private void DrawTargetShapesSection()

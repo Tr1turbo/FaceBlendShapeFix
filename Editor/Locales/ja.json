@@ -43,7 +43,7 @@
     "editor.preview.enter": "プレビュー",
     "editor.preview.exit": "プレビュー終了",
     "editor.preview.passive_preview": "パッシブプレビュー",
-    "editor.preview.passive_preview.tooltip": "グローバルなエディター設定です。有効な場合、Preview を押さなくてもターゲットレンダラーの現在のシェイプキー値に追従してプレビューします。無効にすると、Preview ボタンまたはスライダー操作時のみプレビューします。",
+    "editor.preview.passive_preview.tooltip": "グローバルなエディター設定です。有効な場合、Preview を押さなくてもターゲットレンダラーの現在のシェイプキー値に追従してプレビューします。無効にすると、プレビューボタンまたはスライダー操作時のみプレビューします。",
 
     "editor.main_weight": "メインウェイト",
     "editor.main_weight.tooltip": "この修正対象シェイプキー自体に適用されるウェイト。",
@@ -75,6 +75,10 @@
 
     "editor.blend_shape_definitions": "グローバルシェイプキー定義",
     "editor.active_blend_shape_definitions": "アクティブなシェイプキー定義",
+    "editor.blend_shape_definitions.help.no_renderer": "グローバルシェイプキー定義を表示するには、有効なメッシュを持つ対象の SkinnedMeshRenderer を割り当ててください。",
+    "editor.blend_shape_definitions.help.no_active_blendshapes": "対象レンダラー上でウェイトが 0 を超えているシェイプキーがないため、表示できるアクティブ定義はありません。",
+    "editor.blend_shape_definitions.help.missing_reference_targets": "グローバルシェイプキー定義をまだ推定できません。ウェイトを計算するには、少なくとも 1 つの「両目」ターゲットと 1 つの「口」ターゲットを追加してください。",
+    "editor.blend_shape_definitions.help.no_matching_definitions": "アクティブなシェイプキーは見つかりましたが、表示できる対応するグローバルシェイプキー定義がありません。",
 
     "editor.definition.left_eye_weight": "左目ウェイト",
     "editor.definition.right_eye_weight": "右目ウェイト",

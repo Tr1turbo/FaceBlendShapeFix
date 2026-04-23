@@ -78,6 +78,10 @@
 
     "editor.blend_shape_definitions": "Global BlendShape Definitions",
     "editor.active_blend_shape_definitions": "Active Blend Shape Definitions",
+    "editor.blend_shape_definitions.help.no_renderer": "Assign a target SkinnedMeshRenderer with a valid mesh to view Global BlendShape Definitions.",
+    "editor.blend_shape_definitions.help.no_active_blendshapes": "No blendshape on the target renderer currently has a weight above 0, so there are no active definitions to show.",
+    "editor.blend_shape_definitions.help.missing_reference_targets": "Global BlendShape Definitions cannot be inferred yet. Add at least one “︁Both Eyes”︁ target and one “︁Mouth”︁ target so weights can be calculated.",
+    "editor.blend_shape_definitions.help.no_matching_definitions": "Active blendshapes were found, but no matching Global BlendShape Definitions are available to display.",
     
     "editor.definition.left_eye_weight": "Left Eye Weight",
     "editor.definition.right_eye_weight": "Right Eye Weight",

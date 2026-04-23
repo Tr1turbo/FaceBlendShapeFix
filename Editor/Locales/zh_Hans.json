@@ -75,6 +75,10 @@
 
     "editor.blend_shape_definitions": "全局形态键定义",
     "editor.active_blend_shape_definitions": "活动的形态键定义",
+    "editor.blend_shape_definitions.help.no_renderer": "请先指定带有有效网格的目标 SkinnedMeshRenderer，才能查看全局形态键定义。",
+    "editor.blend_shape_definitions.help.no_active_blendshapes": "目标渲染器当前没有任何权重大于 0 的形态键，因此没有可显示的活动定义。",
+    "editor.blend_shape_definitions.help.missing_reference_targets": "目前还无法推断全局形态键定义。请至少添加 1 个“︁双眼”︁目标和 1 个“︁嘴部”︁目标以便计算权重。",
+    "editor.blend_shape_definitions.help.no_matching_definitions": "已找到活动形态键，但没有可显示的对应全局形态键定义。",
 
     "editor.definition.left_eye_weight": "左眼权重",
     "editor.definition.right_eye_weight": "右眼权重",
