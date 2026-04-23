@@ -2,8 +2,12 @@
     "language.name": "English",
 
     "editor.settings": "Settings",
+    "editor.component_settings": "Component Settings",
+    "editor.global_editor_settings": "Editor Settings",
     "editor.smooth_width": "Smooth Width",
     "editor.smooth_width.tooltip": "Width of the transition zone for L/R blend shape splitting. 0 = hard cut at center.",
+    "editor.target_renderer": "Target Renderer",
+    "editor.target_renderer.tooltip": "SkinnedMeshRenderer used as the source mesh for preview, auto-fill, and blendshape processing.",
     "editor.target_shapes": "BlendShapes Fix Target",
     "editor.category": "Category",
     "editor.category_databases": "Category Databases",
@@ -40,6 +44,14 @@
 
     "editor.preview.enter": "Preview",
     "editor.preview.exit": "Exit Preview",
+    "editor.preview.passive_preview": "Passive Preview",
+    "editor.preview.passive_preview.tooltip": "Global editor setting. When enabled, preview follows the target renderer's live blendshape weights without pressing Preview. Disable this to preview only from the Preview button or slider.",
+    "editor.blend_data_scroll_enabled": "Blend Data Scroll",
+    "editor.blend_data_scroll_enabled.tooltip": "Global editor setting. When enabled, long Blend Data lists are shown inside a scroll view.",
+    "editor.blend_data_scroll_height": "Blend Data Scroll Height",
+    "editor.blend_data_scroll_height.tooltip": "Global editor setting. Height in pixels used for the Blend Data scroll area.",
+    "editor.new_active_blendshape_weight_mode": "When Auto-Adding Active Blendshapes",
+    "editor.new_active_blendshape_weight_mode.tooltip": "Applies only when missing local Blend Data or Global Definitions are created automatically. Existing values are unchanged.",
 
     "editor.main_weight": "Main Weight",
     "editor.main_weight.tooltip": "The weight applied to this fix target blendshape itself.",
@@ -74,6 +86,10 @@
 
     "editor.blend_shape_definitions": "Global BlendShape Definitions",
     "editor.active_blend_shape_definitions": "Active Blend Shape Definitions",
+    "editor.blend_shape_definitions.help.no_renderer": "Assign a target SkinnedMeshRenderer with a valid mesh to view Global BlendShape Definitions.",
+    "editor.blend_shape_definitions.help.no_active_blendshapes": "No blendshape on the target renderer currently has a weight above 0, so there are no active definitions to show.",
+    "editor.blend_shape_definitions.help.missing_reference_targets": "Global BlendShape Definitions cannot be inferred yet. Add at least one “︁Both Eyes”︁ target and one “︁Mouth”︁ target so weights can be calculated.",
+    "editor.blend_shape_definitions.help.no_matching_definitions": "Active blendshapes were found, but no matching Global BlendShape Definitions are available to display.",
     
     "editor.definition.left_eye_weight": "Left Eye Weight",
     "editor.definition.right_eye_weight": "Right Eye Weight",
@@ -88,6 +104,8 @@
     "enum.shapetype.right_eye": "Right Eye",
     "enum.shapetype.mouth": "Mouth",
     "enum.shapetype.others": "Others",
+    "enum.new_active_blendshape_weight_mode.zero": "Initialize to 0",
+    "enum.new_active_blendshape_weight_mode.auto_calculate": "Auto Calculate",
 
     "editor.create_new_category": "+ Create New Category",
     "editor.dialog.create_category.title": "Create New Category",

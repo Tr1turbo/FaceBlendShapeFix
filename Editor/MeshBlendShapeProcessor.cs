@@ -14,9 +14,12 @@ namespace Triturbo.FaceBlendShapeFix
     {
         public static Mesh BakeCorrectedShapes(FaceBlendShapeFixComponent component)
         {
-            var smr = component.m_TargetRenderer != null
-                ? component.m_TargetRenderer
-                : component.GetComponent<SkinnedMeshRenderer>();
+            var smr = component.TargetRenderer;
+            if (smr == null || smr.sharedMesh == null)
+            {
+                return null;
+            }
+
             Mesh oldMesh = smr.sharedMesh;
             Mesh newMesh = Object.Instantiate(oldMesh);
             newMesh.name = oldMesh.name;

@@ -16,13 +16,13 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         internal FaceBlendShapeFixComponent component;
         
         private TargetShapeArrayDrawer _targetShapeArrayDrawer;
-        private BlendShapeDefinitionDrawer blendShapeDefinitionDrawer;
+        private BlendShapeDefinitionDrawer _blendShapeDefinitionDrawer;
 
         private SerializedProperty targetRendererProp;
         private SerializedProperty smoothWidthProp;
         private SerializedProperty targetShapesProp;
         private SerializedProperty blendShapeDefinitionsProp;
-        private SerializedProperty inspectorSettingsProp;
+        private SerializedProperty newActiveBlendShapeWeightModeProp;
         private SerializedProperty categoryDatabasesProp;
         private SerializedProperty customCategoryNamesProp;
 
@@ -37,6 +37,8 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         private string[] _categoryPopupOptions = { "<Unassigned>" };
 
         private bool _settingsFoldout = false;
+        private bool _componentSettingsFoldout = true;
+        private bool _editorSettingsFoldout = false;
         private readonly Dictionary<string, bool> _categoryFoldoutState = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
 
         private string _renamingCategoryKey = null;
@@ -86,13 +88,14 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         { 
             targetShapesProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_TargetShapes));
             blendShapeDefinitionsProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_BlendShapeDefinitions));
-            inspectorSettingsProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_InspectorSettings));
-            targetRendererProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_TargetRenderer));
+            newActiveBlendShapeWeightModeProp =
+                serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_NewActiveBlendShapeWeightMode));
+            targetRendererProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_TargetRendererReference));
             smoothWidthProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_SmoothWidth));
             categoryDatabasesProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_CategoryDatabases));
             customCategoryNamesProp = serializedObject.FindProperty(nameof(FaceBlendShapeFixComponent.m_CustomCategoryNames));
 
-            blendShapeDefinitionDrawer ??= new BlendShapeDefinitionDrawer(this);
+            _blendShapeDefinitionDrawer ??= new BlendShapeDefinitionDrawer(this);
 
 
             component = target as FaceBlendShapeFixComponent;
@@ -101,6 +104,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             _blendShapeActivationObserver = new BlendShapeActivationObserver(component.TargetRenderer);
             _targetShapeArrayDrawer = new TargetShapeArrayDrawer(component, targetShapesProp, _blendShapeActivationObserver);
             _targetShapeArrayDrawer.DrawCategorySelector = DrawCategorySelector;
+            _targetShapeArrayDrawer.OnTargetShapeTypeChanged = HandleTargetShapeTypeChanged;
             
 
             _blendShapeActivationObserver.OnActiveBlendShapesChanged += (change) =>
@@ -110,12 +114,10 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 _targetShapeArrayDrawer.OnActiveBlendShapesChanged(change.Active);
                 Repaint();
             };
-            
-            _targetShapeArrayDrawer.OnActiveBlendShapesChanged(_blendShapeActivationObserver.ActiveShapes);
-            EnsureBlendDataForActiveShapes(_blendShapeActivationObserver.ActiveShapes);
-            EnsureBlendShapeDefinitionsForActiveShapes(_blendShapeActivationObserver.ActiveShapes);
 
-            blendShapeDefinitionDrawer.Initialize(blendShapeDefinitionsProp);
+            SyncTargetRendererObserver(forceRefresh: true);
+
+            _blendShapeDefinitionDrawer.Initialize(blendShapeDefinitionsProp);
             component.m_BlendShapeDefinitions ??= Array.Empty<BlendShapeDefinition>();
         }
 
@@ -123,7 +125,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         {
             component.EndPreview();
             //targetShapeDrawer?.Reset();
-            blendShapeDefinitionDrawer?.Reset();
+            _blendShapeDefinitionDrawer?.Reset();
             _blendShapeActivationObserver.Dispose();
         }
 
@@ -167,58 +169,140 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         #endif
 
             L.DrawLanguagePopup(L.Get("editor.language"));
-            
+
             serializedObject.Update();
+            SyncTargetRendererObserver();
             UpdateCategoryCaches();
             
             Debug.Assert(_blendShapeActivationObserver != null);
             Debug.Assert(_blendShapeActivationObserver.ActiveShapes != null);
 
-            blendShapeDefinitionDrawer?.Draw(_blendShapeActivationObserver.ActiveShapes.ToHashSet());
+            _blendShapeDefinitionDrawer?.Draw(_blendShapeActivationObserver.ActiveShapes.ToHashSet());
             //EditorGUILayout.Space();
             DrawTargetShapesSection();
             //DrawBlendDataTreeView();
-            DrawSettingsFoldout();
+            DrawSettingsSection();
+            DrawAutoFillButton();
 
             serializedObject.ApplyModifiedProperties();
         }
 
 
         // Target shape UI
-        private void DrawSettingsFoldout()
+        private void DrawSettingsSection()
         {
-            
-            _settingsFoldout = EditorGUILayout.BeginFoldoutHeaderGroup(_settingsFoldout, L.Get("editor.settings"));
+            _settingsFoldout = EditorGUILayout.BeginFoldoutHeaderGroup(
+                _settingsFoldout,
+                L.Get("editor.settings"));
             EditorGUILayout.EndFoldoutHeaderGroup();
+
 
             if (_settingsFoldout)
             {
                 using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
                 {
-                    using (new EditorGUI.IndentLevelScope())
-                    {
-                        EditorGUI.BeginChangeCheck();
-                        EditorGUILayout.PropertyField(targetRendererProp);
-                        if (EditorGUI.EndChangeCheck())
-                        {
-                            serializedObject.ApplyModifiedProperties();
-                            serializedObject.Update();
-                        }
-
-                        EditorGUILayout.PropertyField(smoothWidthProp, L.G("editor.smooth_width"));
-                        EditorGUILayout.PropertyField(inspectorSettingsProp);
-                        EditorGUILayout.PropertyField(categoryDatabasesProp, CategoryDatabasesContent, true);
-                        EditorGUILayout.PropertyField(customCategoryNamesProp, CustomCategoryNamesContent, true);
-
-                        
-                        
-
-                    }
+                    DrawComponentSettingsSection();
+                    EditorGUILayout.Space();
+                    DrawEditorSettingsSection();
                 }
             }
 
             EditorGUILayout.Space();
-            
+        }
+
+        private void DrawComponentSettingsSection()
+        {
+            EditorGUI.indentLevel++;
+            _componentSettingsFoldout = EditorGUILayout.Foldout(
+                _componentSettingsFoldout,
+                L.Get("editor.component_settings"),
+                true);
+
+            if (_componentSettingsFoldout)
+            {
+                using (new EditorGUILayout.VerticalScope("box"))
+                {
+                    EditorGUI.BeginChangeCheck();
+                    EditorGUILayout.PropertyField(
+                        targetRendererProp,
+                        L.G("editor.target_renderer"));
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        serializedObject.ApplyModifiedProperties();
+                        serializedObject.Update();
+                        SyncTargetRendererObserver(forceRefresh: true);
+                    }
+
+                    EditorGUILayout.PropertyField(smoothWidthProp, L.G("editor.smooth_width"));
+                    if (newActiveBlendShapeWeightModeProp != null)
+                    {
+                        Rect newWeightModeRect = EditorGUILayout.GetControlRect();
+                        L.LocalizedEnumPropertyField(
+                            newWeightModeRect,
+                            newActiveBlendShapeWeightModeProp,
+                            L.G("editor.new_active_blendshape_weight_mode"),
+                            "enum.new_active_blendshape_weight_mode");
+                    }
+                    EditorGUILayout.PropertyField(categoryDatabasesProp, CategoryDatabasesContent, true);
+                    EditorGUILayout.PropertyField(customCategoryNamesProp, CustomCategoryNamesContent, true);
+                }
+            }
+
+            EditorGUI.indentLevel--;
+        }
+
+        private void DrawEditorSettingsSection()
+        {
+            EditorGUI.indentLevel++;
+
+            _editorSettingsFoldout = EditorGUILayout.Foldout(
+                _editorSettingsFoldout,
+                L.Get("editor.global_editor_settings"),
+                true);
+
+            if (_editorSettingsFoldout)
+            {
+                using (new EditorGUILayout.VerticalScope("box"))
+                {
+                    EditorGUI.BeginChangeCheck();
+                    bool passivePreviewEnabled = EditorGUILayout.Toggle(
+                        FaceBlendShapeFixEditorSettings.PassivePreviewContent,
+                        FaceBlendShapeFixEditorSettings.PassivePreviewEnabled);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        FaceBlendShapeFixEditorSettings.PassivePreviewEnabled = passivePreviewEnabled;
+                        UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+                    }
+
+                    EditorGUI.BeginChangeCheck();
+                    bool enableBlendDataScroll = EditorGUILayout.Toggle(
+                        FaceBlendShapeFixEditorSettings.BlendDataScrollEnabledContent,
+                        FaceBlendShapeFixEditorSettings.BlendDataScrollEnabled);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        FaceBlendShapeFixEditorSettings.BlendDataScrollEnabled = enableBlendDataScroll;
+                    }
+
+                    using (new EditorGUI.DisabledScope(!FaceBlendShapeFixEditorSettings.BlendDataScrollEnabled))
+                    {
+                        EditorGUI.BeginChangeCheck();
+                        float blendDataScrollHeight = EditorGUILayout.DelayedFloatField(
+                            FaceBlendShapeFixEditorSettings.BlendDataScrollHeightContent,
+                            FaceBlendShapeFixEditorSettings.BlendDataScrollHeight);
+                        if (EditorGUI.EndChangeCheck())
+                        {
+                            FaceBlendShapeFixEditorSettings.BlendDataScrollHeight = blendDataScrollHeight;
+                        }
+                    }
+                }
+            }
+
+            EditorGUI.indentLevel--;
+
+        }
+
+        private void DrawAutoFillButton()
+        {
             using (new EditorGUI.DisabledScope(component?.m_CategoryDatabases == null || component.m_CategoryDatabases.Length == 0 ||
             component.TargetRenderer == null || component.TargetRenderer.sharedMesh == null))
             {
@@ -233,6 +317,55 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     serializedObject.Update();
                 }
             }
+        }
+
+        private void SyncTargetRendererObserver(bool forceRefresh = false)
+        {
+            if (_blendShapeActivationObserver == null)
+            {
+                return;
+            }
+
+            SkinnedMeshRenderer currentRenderer = component?.TargetRenderer;
+            bool rendererChanged = _blendShapeActivationObserver.Renderer != currentRenderer;
+            if (rendererChanged)
+            {
+                _blendShapeActivationObserver.Renderer = currentRenderer;
+            }
+
+            if (!forceRefresh && !rendererChanged)
+            {
+                return;
+            }
+
+            if (forceRefresh)
+            {
+                _blendShapeActivationObserver.Refresh();
+            }
+
+            _targetShapeArrayDrawer?.OnActiveBlendShapesChanged(_blendShapeActivationObserver.ActiveShapes);
+            EnsureBlendDataForActiveShapes(_blendShapeActivationObserver.ActiveShapes);
+            EnsureBlendShapeDefinitionsForActiveShapes(_blendShapeActivationObserver.ActiveShapes);
+        }
+        private void HandleTargetShapeTypeChanged()
+        {
+            if (component == null)
+            {
+                return;
+            }
+            if (component.m_BlendShapeDefinitions != null && 
+                _blendShapeDefinitionDrawer?.HasActiveDefinition == true)
+            {
+                return;
+            }
+            IReadOnlyCollection<string> activeBlendShapes = _blendShapeActivationObserver?.ActiveShapes;
+            if (activeBlendShapes == null || activeBlendShapes.Count == 0)
+            {
+                return;
+            }
+            serializedObject.ApplyModifiedProperties();
+            EnsureBlendShapeDefinitionsForActiveShapes(activeBlendShapes);
+            serializedObject.Update();
         }
 
         private void DrawTargetShapesSection()
@@ -1098,15 +1231,22 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
             Mesh mesh = component.TargetRenderer.sharedMesh;
             var definitions = component.m_BlendShapeDefinitions?.ToList() ?? new List<BlendShapeDefinition>();
-            List<int> eyeReferences = BlendShapeDataUtil.GetBlendShapeIndices(
-                mesh,
-                BlendShapeDataUtil.GetBlendShapesFromType(component.m_TargetShapes, ShapeType.BothEyes));
-            List<int> mouthReferences = BlendShapeDataUtil.GetBlendShapeIndices(
-                mesh,
-                BlendShapeDataUtil.GetBlendShapesFromType(component.m_TargetShapes, ShapeType.Mouth));
-            if (eyeReferences.Count == 0 || mouthReferences.Count == 0)
+            NewActiveBlendShapeWeightMode creationMode = component.m_NewActiveBlendShapeWeightMode;
+            List<int> eyeReferences = null;
+            List<int> mouthReferences = null;
+
+            if (creationMode == NewActiveBlendShapeWeightMode.AutoCalculate)
             {
-                return;
+                eyeReferences = BlendShapeDataUtil.GetBlendShapeIndices(
+                    mesh,
+                    BlendShapeDataUtil.GetBlendShapesFromType(component.m_TargetShapes, ShapeType.BothEyes));
+                mouthReferences = BlendShapeDataUtil.GetBlendShapeIndices(
+                    mesh,
+                    BlendShapeDataUtil.GetBlendShapesFromType(component.m_TargetShapes, ShapeType.Mouth));
+                if (eyeReferences.Count == 0 || mouthReferences.Count == 0)
+                {
+                    return;
+                }
             }
 
             bool recordedUndo = false;
@@ -1121,12 +1261,13 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 {
                     continue;
                 }
-                BlendShapeDefinition definition = BlendShapeDataUtil.CreateDefinition(
+                BlendShapeDefinition definition = BlendShapeDataUtil.CreateDefaultDefinition(
                     component.TargetRenderer,
                     index,
                     eyeReferences,
                     mouthReferences,
-                    BlendShapeDataUtil.BlendShapeComparisonMode.Max);
+                    BlendShapeDataUtil.BlendShapeComparisonMode.Max,
+                    creationMode);
                 if (definition == null)
                 {
                     continue;
@@ -1162,6 +1303,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             bool recordedUndo = false;
             bool addedBlendData = false;
             var smr = component.TargetRenderer;
+            NewActiveBlendShapeWeightMode creationMode = component.m_NewActiveBlendShapeWeightMode;
             
             foreach (var targetShape in component.m_TargetShapes ?? Enumerable.Empty<TargetShape>())
             {
@@ -1176,7 +1318,11 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     recordedUndo = true;
                 }
 
-                bool updatedShape = BlendShapeDataUtil.EnsureBlendDataForActiveShapes(targetShape, newActiveBlendShapes, smr);
+                bool updatedShape = BlendShapeDataUtil.EnsureBlendDataForActiveShapes(
+                    targetShape,
+                    newActiveBlendShapes,
+                    smr,
+                    creationMode);
                 if (updatedShape)
                 {
                     addedBlendData = true;

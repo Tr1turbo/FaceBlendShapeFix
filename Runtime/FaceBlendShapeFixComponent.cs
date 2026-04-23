@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 #if FBF_VRCSDK_BASE
 using VRC.SDKBase;
@@ -7,21 +8,42 @@ using VRC.SDKBase;
 
 namespace Triturbo.FaceBlendShapeFix.Runtime
 {
+    public enum NewActiveBlendShapeWeightMode
+    {
+        Zero = 0,
+        AutoCalculate = 1
+    }
+
     [AddComponentMenu("Triturbo/Face BlendShape Fix")]
     public class FaceBlendShapeFixComponent : MonoBehaviour
 #if FBF_VRCSDK_BASE
     , IEditorOnly
 #endif
     {
-        public SkinnedMeshRenderer m_TargetRenderer;
+        public AvatarObjectReference<SkinnedMeshRenderer> m_TargetRendererReference = new AvatarObjectReference<SkinnedMeshRenderer>();
+
+        [FormerlySerializedAs("m_TargetRenderer")]
+        [SerializeField]
+        [HideInInspector]
+        private SkinnedMeshRenderer m_LegacyTargetRenderer;
+
         public SkinnedMeshRenderer TargetRenderer
         {
             get
             {
-                if (m_TargetRenderer == null)
-                    return transform.GetComponent<SkinnedMeshRenderer>();
+                MigrateLegacyTargetRendererIfNeeded();
 
-                return m_TargetRenderer;
+                if (m_TargetRendererReference != null && m_TargetRendererReference.IsConfigured)
+                {
+                    return m_TargetRendererReference.Get(this);
+                }
+
+                if (transform.TryGetComponent<SkinnedMeshRenderer>(out var smr))
+                {
+                    return smr;
+                }
+
+                return null;
             }
         }
 
@@ -42,12 +64,46 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
         [Range(0f, 0.1f)]
         public float m_SmoothWidth = 0f;
 
-
-        public InspectorSettings m_InspectorSettings;
+        public NewActiveBlendShapeWeightMode m_NewActiveBlendShapeWeightMode =
+            NewActiveBlendShapeWeightMode.AutoCalculate;
 
         private void Reset()
         {
+            EnsureTargetRendererReferenceInitialized();
+            MigrateLegacyTargetRendererIfNeeded();
             m_CategoryDatabases = new[] { m_CategoryDatabase };
+        }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            EnsureTargetRendererReferenceInitialized();
+            MigrateLegacyTargetRendererIfNeeded();
+        }
+#endif
+        private AvatarObjectReference<SkinnedMeshRenderer> EnsureTargetRendererReferenceInitialized()
+        {
+            if (m_TargetRendererReference == null)
+            {
+                m_TargetRendererReference = new AvatarObjectReference<SkinnedMeshRenderer>();
+            }
+
+            return m_TargetRendererReference;
+        }
+
+        private void MigrateLegacyTargetRendererIfNeeded()
+        {
+            AvatarObjectReference<SkinnedMeshRenderer> targetRendererReference = EnsureTargetRendererReferenceInitialized();
+
+            if (m_LegacyTargetRenderer != null && !targetRendererReference.IsConfigured)
+            {
+                targetRendererReference.Set(m_LegacyTargetRenderer);
+            }
+
+            if (m_LegacyTargetRenderer != null)
+            {
+                m_LegacyTargetRenderer = null;
+            }
         }
 
 
@@ -114,12 +170,5 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
             _targetIndex = targetIndex;
             Weight = weight;
         }
-    }
-
-    [Serializable]
-    public class InspectorSettings
-    {
-        public bool m_EnableBlendDataScroll = true;
-        public float m_BlendDataScrollHeight = 240f;
     }
 }

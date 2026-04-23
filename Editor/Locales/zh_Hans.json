@@ -2,8 +2,12 @@
     "language.name": "简体中文",
 
     "editor.settings": "设置",
+    "editor.component_settings": "组件设置",
+    "editor.global_editor_settings": "编辑器设置",
     "editor.smooth_width": "平滑宽度",
     "editor.smooth_width.tooltip": "左右形态键分割过渡区域的宽度。0 = 中心硬切割。",
+    "editor.target_renderer": "目标渲染器",
+    "editor.target_renderer.tooltip": "用于预览、自动填充和形态键处理源网格的 SkinnedMeshRenderer。",
     "editor.target_shapes": "形态键修复目标",
     "editor.category": "分类",
     "editor.category_databases": "分类数据库",
@@ -40,6 +44,14 @@
 
     "editor.preview.enter": "预览",
     "editor.preview.exit": "退出预览",
+    "editor.preview.passive_preview": "被动预览",
+    "editor.preview.passive_preview.tooltip": "全局编辑器设置。启用时，即使不按下预览，也会根据目标渲染器当前的形态键权重显示预览。禁用后，只有使用预览按钮或滑块时才会预览。",
+    "editor.blend_data_scroll_enabled": "Blend Data 滚动",
+    "editor.blend_data_scroll_enabled.tooltip": "全局编辑器设置。启用后，较长的 Blend Data 列表会显示在可滚动区域中。",
+    "editor.blend_data_scroll_height": "Blend Data 滚动高度",
+    "editor.blend_data_scroll_height.tooltip": "全局编辑器设置。Blend Data 滚动区域使用的像素高度。",
+    "editor.new_active_blendshape_weight_mode": "自动添加活动形态键时",
+    "editor.new_active_blendshape_weight_mode.tooltip": "仅在缺失的本地 Blend Data 或全局定义被自动创建时生效。现有值不会改变。",
 
     "editor.main_weight": "主权重",
     "editor.main_weight.tooltip": "应用于此修复目标形态键本身的权重。",
@@ -71,6 +83,10 @@
 
     "editor.blend_shape_definitions": "全局形态键定义",
     "editor.active_blend_shape_definitions": "活动的形态键定义",
+    "editor.blend_shape_definitions.help.no_renderer": "请先指定带有有效网格的目标 SkinnedMeshRenderer，才能查看全局形态键定义。",
+    "editor.blend_shape_definitions.help.no_active_blendshapes": "目标渲染器当前没有任何权重大于 0 的形态键，因此没有可显示的活动定义。",
+    "editor.blend_shape_definitions.help.missing_reference_targets": "目前还无法推断全局形态键定义。请至少添加 1 个“︁双眼”︁目标和 1 个“︁嘴部”︁目标以便计算权重。",
+    "editor.blend_shape_definitions.help.no_matching_definitions": "已找到活动形态键，但没有可显示的对应全局形态键定义。",
 
     "editor.definition.left_eye_weight": "左眼权重",
     "editor.definition.right_eye_weight": "右眼权重",
@@ -85,6 +101,8 @@
     "enum.shapetype.right_eye": "右眼",
     "enum.shapetype.mouth": "嘴部",
     "enum.shapetype.others": "其他",
+    "enum.new_active_blendshape_weight_mode.zero": "初始化为 0",
+    "enum.new_active_blendshape_weight_mode.auto_calculate": "自动计算",
 
     "editor.create_new_category": "+ 创建新分类",
     "editor.dialog.create_category.title": "创建新分类",

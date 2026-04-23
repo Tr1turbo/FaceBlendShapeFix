@@ -2,8 +2,12 @@
     "language.name": "繁體中文",
 
     "editor.settings": "設定",
+    "editor.component_settings": "組件設定",
+    "editor.global_editor_settings": "編輯器設定",
     "editor.smooth_width": "平滑寬度",
     "editor.smooth_width.tooltip": "左右型態鍵分割過渡區域的寬度。0 = 中心硬切割。",
+    "editor.target_renderer": "目標渲染器",
+    "editor.target_renderer.tooltip": "用作預覽、自動填入與型態鍵處理來源網格的 SkinnedMeshRenderer。",
     "editor.target_shapes": "型態鍵修復目標",
     "editor.category": "分類",
     "editor.category_databases": "分類資料庫",
@@ -40,6 +44,14 @@
 
     "editor.preview.enter": "預覽",
     "editor.preview.exit": "結束預覽",
+    "editor.preview.passive_preview": "被動預覽",
+    "editor.preview.passive_preview.tooltip": "全域編輯器設定。啟用時，即使未按下預覽，也會根據目標渲染器目前的型態鍵權重顯示預覽。停用後，只有使用預覽按鈕或滑桿時才會預覽。",
+    "editor.blend_data_scroll_enabled": "Blend Data 捲動",
+    "editor.blend_data_scroll_enabled.tooltip": "全域編輯器設定。啟用後，較長的 Blend Data 清單會顯示在可捲動區域中。",
+    "editor.blend_data_scroll_height": "Blend Data 捲動高度",
+    "editor.blend_data_scroll_height.tooltip": "全域編輯器設定。Blend Data 捲動區域使用的像素高度。",
+    "editor.new_active_blendshape_weight_mode": "自動加入作用中型態鍵時",
+    "editor.new_active_blendshape_weight_mode.tooltip": "僅在缺少的區域 Blend Data 或全域定義被自動建立時套用。既有值不會變更。",
 
     "editor.main_weight": "主權重",
     "editor.main_weight.tooltip": "套用於此修復目標型態鍵本身的權重。",
@@ -71,6 +83,10 @@
 
     "editor.blend_shape_definitions": "全域型態鍵定義",
     "editor.active_blend_shape_definitions": "作用中的型態鍵定義",
+    "editor.blend_shape_definitions.help.no_renderer": "請指派具有有效網格的目標 SkinnedMeshRenderer，才能檢視全域型態鍵定義。",
+    "editor.blend_shape_definitions.help.no_active_blendshapes": "目標渲染器目前沒有任何權重大於 0 的型態鍵，因此沒有可顯示的作用中定義。",
+    "editor.blend_shape_definitions.help.missing_reference_targets": "目前無法推算全域型態鍵定義。請至少新增 1 個「雙眼」目標與 1 個「嘴部」目標，才能計算權重。",
+    "editor.blend_shape_definitions.help.no_matching_definitions": "已找到作用中的型態鍵，但沒有可顯示的對應全域型態鍵定義。",
 
     "editor.definition.left_eye_weight": "左眼權重",
     "editor.definition.right_eye_weight": "右眼權重",
@@ -85,6 +101,8 @@
     "enum.shapetype.right_eye": "右眼",
     "enum.shapetype.mouth": "嘴部",
     "enum.shapetype.others": "其他",
+    "enum.new_active_blendshape_weight_mode.zero": "初始化為 0",
+    "enum.new_active_blendshape_weight_mode.auto_calculate": "自動計算",
 
     "editor.create_new_category": "+ 建立新分類",
     "editor.dialog.create_category.title": "建立新分類",
