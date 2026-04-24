@@ -407,7 +407,8 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
                         if (isUpdated && isCurrentPreview)
                         {
-                            SceneView.RepaintAll();
+                            // If use SceneView.RepaintAll() no update when no scene.
+                            InternalEditorUtility.RepaintAllViews();
                         }
                     }
                     
@@ -755,6 +756,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             IReadOnlyDictionary<string, BlendShapeDefinition> definitions = GetDefinitionLookup();
 
             float mainWeight = targetShape.FindPropertyRelative(nameof(TargetShape.m_Weight)).floatValue;
+            var analysisCache = new BlendShapeDataUtil.BlendShapeAnalysisCache(mesh);
 
             int undoGroup = Undo.GetCurrentGroup();
             Undo.SetCurrentGroupName("Auto Calculate Blend Data");
@@ -784,7 +786,12 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     continue;
                 }
 
-                BlendData calculated = BlendShapeDataUtil.CreateBlendData(smr, mainShapeIndex, blendIndex, mainWeight);
+                BlendData calculated = BlendShapeDataUtil.CreateBlendData(
+                    analysisCache,
+                    smr,
+                    mainShapeIndex,
+                    blendIndex,
+                    mainWeight);
                 if (calculated == null)
                 {
                     continue;

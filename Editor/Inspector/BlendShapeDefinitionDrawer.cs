@@ -343,6 +343,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             int undoGroup = Undo.GetCurrentGroup();
             Undo.SetCurrentGroupName("Auto Calculate BlendShape Definitions");
             Undo.RecordObject(serializedObject.targetObject, "Auto Calculate BlendShape Definitions");
+            var analysisCache = new BlendShapeDataUtil.BlendShapeAnalysisCache(mesh);
             foreach (int index in activeDefinitionIndices)
             {
                 SerializedProperty element = definitionsProperty.GetArrayElementAtIndex(index);
@@ -364,6 +365,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 }
 
                 BlendShapeDefinition calculated = BlendShapeDataUtil.CreateDefinition(
+                    analysisCache,
                     smr,
                     shapeIndex,
                     eyeReferences,

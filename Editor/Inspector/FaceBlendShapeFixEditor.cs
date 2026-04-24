@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using Triturbo.FaceBlendShapeFix.Runtime;
 using UnityEngine;
 using UnityEditor;
@@ -67,6 +69,17 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
 
         private BlendShapeActivationObserver _blendShapeActivationObserver;
+        private BlendShapeDataUtil.BlendShapeAnalysisCache _blendShapeAnalysisCache;
+        private readonly HashSet<string> _queuedBlendShapeSyncNames = new HashSet<string>(StringComparer.Ordinal);
+        private Task<BlendShapeDataUtil.BackgroundBlendShapeSyncResult> _blendShapeSyncTask;
+        private BlendShapeDataUtil.BackgroundBlendShapeSyncRequest _blendShapeSyncRequest;
+        private Mesh _blendShapeSyncMesh;
+        private int _blendShapeSyncInvalidationVersion;
+        private int _activeBlendShapeSyncInvalidationVersion;
+        private bool _blendShapeSyncBypassDelay;
+        private double _blendShapeSyncEarliestStartTime;
+
+        private const double BlendShapeSyncIdleDelaySeconds = 0.25d;
 
         [SerializeField]
         private Texture2D BannerIcon;
@@ -100,8 +113,9 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
             component = target as FaceBlendShapeFixComponent;
             Debug.Assert(component != null);
-            
+
             _blendShapeActivationObserver = new BlendShapeActivationObserver(component.TargetRenderer);
+            _blendShapeActivationObserver.OnBlendShapeWeightsEdited += HandleBlendShapeWeightsEdited;
             _targetShapeArrayDrawer = new TargetShapeArrayDrawer(component, targetShapesProp, _blendShapeActivationObserver);
             _targetShapeArrayDrawer.DrawCategorySelector = DrawCategorySelector;
             _targetShapeArrayDrawer.OnTargetShapeTypeChanged = HandleTargetShapeTypeChanged;
@@ -109,12 +123,12 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
             _blendShapeActivationObserver.OnActiveBlendShapesChanged += (change) =>
             {
-                EnsureBlendDataForActiveShapes(change.Added);
-                EnsureBlendShapeDefinitionsForActiveShapes(change.Added);
+                QueueBlendShapeSync(change.Added);
                 _targetShapeArrayDrawer.OnActiveBlendShapesChanged(change.Active);
                 Repaint();
             };
 
+            EditorApplication.update += OnEditorUpdate;
             SyncTargetRendererObserver(forceRefresh: true);
 
             _blendShapeDefinitionDrawer.Initialize(blendShapeDefinitionsProp);
@@ -123,10 +137,20 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
         private void OnDisable()
         {
+            DrainPendingBlendShapeSync();
             component.EndPreview();
             //targetShapeDrawer?.Reset();
             _blendShapeDefinitionDrawer?.Reset();
             _blendShapeActivationObserver.Dispose();
+            _queuedBlendShapeSyncNames.Clear();
+            _blendShapeSyncInvalidationVersion++;
+            _blendShapeSyncTask = null;
+            _blendShapeSyncRequest = null;
+            _blendShapeSyncMesh = null;
+            _blendShapeAnalysisCache = null;
+            _blendShapeSyncBypassDelay = false;
+            _blendShapeSyncEarliestStartTime = 0d;
+            EditorApplication.update -= OnEditorUpdate;
         }
 
         // Inspector rendering
@@ -275,6 +299,15 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     }
 
                     EditorGUI.BeginChangeCheck();
+                    bool diagnosticsLoggingEnabled = EditorGUILayout.Toggle(
+                        FaceBlendShapeFixEditorSettings.DiagnosticsLoggingContent,
+                        FaceBlendShapeFixEditorSettings.DiagnosticsLoggingEnabled);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        FaceBlendShapeFixEditorSettings.DiagnosticsLoggingEnabled = diagnosticsLoggingEnabled;
+                    }
+
+                    EditorGUI.BeginChangeCheck();
                     bool enableBlendDataScroll = EditorGUILayout.Toggle(
                         FaceBlendShapeFixEditorSettings.BlendDataScrollEnabledContent,
                         FaceBlendShapeFixEditorSettings.BlendDataScrollEnabled);
@@ -310,10 +343,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 {
                     serializedObject.ApplyModifiedProperties();
                     AutoFillFromCategories();
-                    EnsureBlendDataForActiveShapes(_blendShapeActivationObserver.ActiveShapes.ToHashSet());
-                    
-                    serializedObject.ApplyModifiedProperties();
-                    EnsureBlendShapeDefinitionsForActiveShapes(_blendShapeActivationObserver.ActiveShapes.ToHashSet());
+                    QueueBlendShapeSync(_blendShapeActivationObserver.ActiveShapes.ToHashSet(), forceResync: true);
                     serializedObject.Update();
                 }
             }
@@ -344,8 +374,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             }
 
             _targetShapeArrayDrawer?.OnActiveBlendShapesChanged(_blendShapeActivationObserver.ActiveShapes);
-            EnsureBlendDataForActiveShapes(_blendShapeActivationObserver.ActiveShapes);
-            EnsureBlendShapeDefinitionsForActiveShapes(_blendShapeActivationObserver.ActiveShapes);
+            QueueBlendShapeSync(_blendShapeActivationObserver.ActiveShapes, forceResync: true);
         }
         private void HandleTargetShapeTypeChanged()
         {
@@ -364,7 +393,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 return;
             }
             serializedObject.ApplyModifiedProperties();
-            EnsureBlendShapeDefinitionsForActiveShapes(activeBlendShapes);
+            QueueBlendShapeSync(activeBlendShapes, forceResync: true);
             serializedObject.Update();
         }
 
@@ -639,8 +668,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             EditorUtility.SetDirty(component);
             
             
-            EnsureBlendDataForActiveShapes(_blendShapeActivationObserver.ActiveShapes.ToHashSet());
-            EnsureBlendShapeDefinitionsForActiveShapes(_blendShapeActivationObserver.ActiveShapes.ToHashSet());
+            QueueBlendShapeSync(_blendShapeActivationObserver.ActiveShapes.ToHashSet(), forceResync: true);
             serializedObject.Update();
         }
 
@@ -1222,6 +1250,548 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         }
 
         // Data sync
+        private void OnEditorUpdate()
+        {
+            ProcessCompletedBlendShapeSync();
+            TryStartQueuedBlendShapeSync();
+        }
+
+        private void QueueBlendShapeSync(
+            IReadOnlyCollection<string> blendShapeNames,
+            bool forceResync = false)
+        {
+            if (forceResync)
+            {
+                _blendShapeSyncInvalidationVersion++;
+                _blendShapeSyncBypassDelay = true;
+            }
+
+            if (component == null ||
+                component.TargetRenderer == null ||
+                component.TargetRenderer.sharedMesh == null)
+            {
+                if (forceResync)
+                {
+                    _queuedBlendShapeSyncNames.Clear();
+                    _blendShapeSyncBypassDelay = false;
+                }
+
+                return;
+            }
+
+            if (blendShapeNames == null || blendShapeNames.Count == 0)
+            {
+                if (forceResync)
+                {
+                    _queuedBlendShapeSyncNames.Clear();
+                    _blendShapeSyncBypassDelay = false;
+                }
+
+                return;
+            }
+
+            bool queuedAny = false;
+            bool hasValidRequestedName = false;
+            foreach (string blendShapeName in blendShapeNames)
+            {
+                if (!string.IsNullOrEmpty(blendShapeName))
+                {
+                    hasValidRequestedName = true;
+                    queuedAny |= _queuedBlendShapeSyncNames.Add(blendShapeName);
+                }
+            }
+
+            if (!hasValidRequestedName)
+            {
+                if (forceResync)
+                {
+                    _queuedBlendShapeSyncNames.Clear();
+                    _blendShapeSyncBypassDelay = false;
+                }
+
+                return;
+            }
+
+            if (!forceResync && !queuedAny)
+            {
+                return;
+            }
+
+            TryStartQueuedBlendShapeSync();
+        }
+
+        private void HandleBlendShapeWeightsEdited()
+        {
+            _blendShapeSyncEarliestStartTime = EditorApplication.timeSinceStartup + BlendShapeSyncIdleDelaySeconds;
+        }
+
+        private void TryStartQueuedBlendShapeSync()
+        {
+            if (_blendShapeSyncTask != null || _queuedBlendShapeSyncNames.Count == 0)
+            {
+                return;
+            }
+
+            if (!_blendShapeSyncBypassDelay &&
+                EditorApplication.timeSinceStartup < _blendShapeSyncEarliestStartTime)
+            {
+                return;
+            }
+
+            // Mesh access stays on the editor thread; only the score calculation is handed off.
+            BlendShapeDataUtil.BackgroundBlendShapeSyncRequest request =
+                BuildBlendShapeSyncRequest(_queuedBlendShapeSyncNames);
+            _queuedBlendShapeSyncNames.Clear();
+            _blendShapeSyncBypassDelay = false;
+
+            if (request == null)
+            {
+                return;
+            }
+
+            _blendShapeSyncRequest = request;
+            _blendShapeSyncMesh = component?.TargetRenderer?.sharedMesh;
+            _activeBlendShapeSyncInvalidationVersion = _blendShapeSyncInvalidationVersion;
+            _blendShapeSyncTask = Task.Run(() => BlendShapeDataUtil.AnalyzeBackgroundBlendShapeSync(request));
+        }
+
+        private void DrainPendingBlendShapeSync()
+        {
+            if (_blendShapeSyncTask != null)
+            {
+                if (!_blendShapeSyncTask.IsCompleted)
+                {
+                    try
+                    {
+                        _blendShapeSyncTask.Wait();
+                    }
+                    catch (AggregateException)
+                    {
+                    }
+                }
+
+                ProcessCompletedBlendShapeSync();
+            }
+
+            ProcessQueuedBlendShapeSyncSynchronously();
+        }
+
+        private void ProcessQueuedBlendShapeSyncSynchronously()
+        {
+            if (_queuedBlendShapeSyncNames.Count == 0)
+            {
+                return;
+            }
+
+            BlendShapeDataUtil.BackgroundBlendShapeSyncRequest request =
+                BuildBlendShapeSyncRequest(_queuedBlendShapeSyncNames);
+            _queuedBlendShapeSyncNames.Clear();
+            _blendShapeSyncBypassDelay = false;
+
+            if (request == null)
+            {
+                return;
+            }
+
+            Mesh requestMesh = component?.TargetRenderer?.sharedMesh;
+            int requestInvalidationVersion = _blendShapeSyncInvalidationVersion;
+            BlendShapeDataUtil.BackgroundBlendShapeSyncResult result =
+                BlendShapeDataUtil.AnalyzeBackgroundBlendShapeSync(request);
+            ApplyCompletedBlendShapeSyncResult(request, result, requestMesh, requestInvalidationVersion);
+        }
+
+        private void ProcessCompletedBlendShapeSync()
+        {
+            if (_blendShapeSyncTask == null || !_blendShapeSyncTask.IsCompleted)
+            {
+                return;
+            }
+
+            Task<BlendShapeDataUtil.BackgroundBlendShapeSyncResult> completedTask = _blendShapeSyncTask;
+            BlendShapeDataUtil.BackgroundBlendShapeSyncRequest request = _blendShapeSyncRequest;
+            Mesh requestMesh = _blendShapeSyncMesh;
+            int requestInvalidationVersion = _activeBlendShapeSyncInvalidationVersion;
+
+            _blendShapeSyncTask = null;
+            _blendShapeSyncRequest = null;
+            _blendShapeSyncMesh = null;
+            _activeBlendShapeSyncInvalidationVersion = 0;
+
+            if (completedTask.IsFaulted)
+            {
+                Exception exception = completedTask.Exception?.GetBaseException() ?? completedTask.Exception;
+                if (exception != null)
+                {
+                    Debug.LogException(exception);
+                }
+                return;
+            }
+
+            if (completedTask.IsCanceled)
+            {
+                return;
+            }
+
+            BlendShapeDataUtil.BackgroundBlendShapeSyncResult result = completedTask.Result;
+            ApplyCompletedBlendShapeSyncResult(request, result, requestMesh, requestInvalidationVersion);
+        }
+
+        private void ApplyCompletedBlendShapeSyncResult(
+            BlendShapeDataUtil.BackgroundBlendShapeSyncRequest request,
+            BlendShapeDataUtil.BackgroundBlendShapeSyncResult result,
+            Mesh requestMesh,
+            int requestInvalidationVersion)
+        {
+            bool applied = requestInvalidationVersion == _blendShapeSyncInvalidationVersion &&
+                component != null &&
+                component.TargetRenderer != null &&
+                component.TargetRenderer.sharedMesh == requestMesh;
+
+            if (!applied)
+            {
+                LogBlendShapeSyncProfile(request, result, applied, 0d);
+                return;
+            }
+
+            Stopwatch applyStopwatch = Stopwatch.StartNew();
+            ApplyBlendShapeSyncResult(request, result);
+            applyStopwatch.Stop();
+
+            LogBlendShapeSyncProfile(request, result, applied, applyStopwatch.Elapsed.TotalMilliseconds);
+        }
+
+        private BlendShapeDataUtil.BackgroundBlendShapeSyncRequest BuildBlendShapeSyncRequest(
+            IReadOnlyCollection<string> requestedShapeNames)
+        {
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            if (component == null || component.TargetRenderer == null || component.TargetRenderer.sharedMesh == null)
+            {
+                return null;
+            }
+
+            Mesh mesh = component.TargetRenderer.sharedMesh;
+            if (requestedShapeNames == null || requestedShapeNames.Count == 0)
+            {
+                return null;
+            }
+
+            _blendShapeAnalysisCache = _blendShapeAnalysisCache != null && _blendShapeAnalysisCache.Mesh == mesh
+                ? _blendShapeAnalysisCache
+                : new BlendShapeDataUtil.BlendShapeAnalysisCache(mesh);
+
+            var request = new BlendShapeDataUtil.BackgroundBlendShapeSyncRequest
+            {
+                CreationMode = component.m_NewActiveBlendShapeWeightMode,
+                ComparisonMode = BlendShapeDataUtil.BlendShapeComparisonMode.Max,
+                Vertices = _blendShapeAnalysisCache.Vertices
+            };
+
+            var requestedShapeIndices = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (string shapeName in requestedShapeNames)
+            {
+                if (string.IsNullOrEmpty(shapeName))
+                {
+                    continue;
+                }
+
+                int shapeIndex = mesh.GetBlendShapeIndex(shapeName);
+                if (shapeIndex >= 0)
+                {
+                    requestedShapeIndices[shapeName] = shapeIndex;
+                }
+            }
+
+            if (requestedShapeIndices.Count == 0)
+            {
+                return null;
+            }
+
+            request.RequestedShapeCount = requestedShapeIndices.Count;
+
+            var requiredDeltaIndices = new HashSet<int>();
+            var existingDefinitionNames = new HashSet<string>(
+                (component.m_BlendShapeDefinitions ?? Array.Empty<BlendShapeDefinition>())
+                    .Where(definition => definition != null && !string.IsNullOrEmpty(definition.m_BlendShapeName))
+                    .Select(definition => definition.m_BlendShapeName),
+                StringComparer.Ordinal);
+
+            if (request.CreationMode == NewActiveBlendShapeWeightMode.AutoCalculate)
+            {
+                request.EyeReferenceIndices = BlendShapeDataUtil.GetBlendShapeIndices(
+                    mesh,
+                    BlendShapeDataUtil.GetBlendShapesFromType(component.m_TargetShapes, ShapeType.BothEyes));
+                request.MouthReferenceIndices = BlendShapeDataUtil.GetBlendShapeIndices(
+                    mesh,
+                    BlendShapeDataUtil.GetBlendShapesFromType(component.m_TargetShapes, ShapeType.Mouth));
+
+                if (request.EyeReferenceIndices.Count > 0 && request.MouthReferenceIndices.Count > 0)
+                {
+                    foreach (int eyeReferenceIndex in request.EyeReferenceIndices)
+                    {
+                        requiredDeltaIndices.Add(eyeReferenceIndex);
+                    }
+
+                    foreach (int mouthReferenceIndex in request.MouthReferenceIndices)
+                    {
+                        requiredDeltaIndices.Add(mouthReferenceIndex);
+                    }
+
+                    foreach (KeyValuePair<string, int> requestedShape in requestedShapeIndices)
+                    {
+                        string shapeName = requestedShape.Key;
+                        int shapeIndex = requestedShape.Value;
+                        if (existingDefinitionNames.Contains(shapeName))
+                        {
+                            continue;
+                        }
+
+                        request.DefinitionRequests.Add(new BlendShapeDataUtil.BackgroundBlendShapeDefinitionRequest
+                        {
+                            ShapeName = shapeName,
+                            ShapeIndex = shapeIndex
+                        });
+                        requiredDeltaIndices.Add(shapeIndex);
+                    }
+                }
+            }
+            else
+            {
+                foreach (KeyValuePair<string, int> requestedShape in requestedShapeIndices)
+                {
+                    string shapeName = requestedShape.Key;
+                    int shapeIndex = requestedShape.Value;
+                    if (existingDefinitionNames.Contains(shapeName))
+                    {
+                        continue;
+                    }
+
+                    request.DefinitionRequests.Add(new BlendShapeDataUtil.BackgroundBlendShapeDefinitionRequest
+                    {
+                        ShapeName = shapeName,
+                        ShapeIndex = shapeIndex
+                    });
+                }
+            }
+
+            TargetShape[] targetShapes = component.m_TargetShapes ?? Array.Empty<TargetShape>();
+            for (int i = 0; i < targetShapes.Length; i++)
+            {
+                TargetShape targetShape = targetShapes[i];
+                if (targetShape == null || string.IsNullOrEmpty(targetShape.m_TargetShapeName))
+                {
+                    continue;
+                }
+
+                int mainShapeIndex = mesh.GetBlendShapeIndex(targetShape.m_TargetShapeName);
+                if (mainShapeIndex < 0)
+                {
+                    continue;
+                }
+
+                var existingBlendShapeNames = new HashSet<string>(
+                    (targetShape.m_BlendData ?? Array.Empty<BlendData>())
+                        .Where(blendData => blendData != null && !string.IsNullOrEmpty(blendData.m_TargetShapeName))
+                        .Select(blendData => blendData.m_TargetShapeName),
+                    StringComparer.Ordinal);
+                BlendShapeDataUtil.BackgroundTargetShapeBlendDataRequest targetShapeRequest = null;
+
+                foreach (KeyValuePair<string, int> requestedShape in requestedShapeIndices)
+                {
+                    string shapeName = requestedShape.Key;
+                    int shapeIndex = requestedShape.Value;
+                    if (existingBlendShapeNames.Contains(shapeName))
+                    {
+                        continue;
+                    }
+
+                    targetShapeRequest ??= new BlendShapeDataUtil.BackgroundTargetShapeBlendDataRequest
+                    {
+                        TargetShapeArrayIndex = i,
+                        TargetShapeName = targetShape.m_TargetShapeName,
+                        TargetShapeWeight = targetShape.m_Weight,
+                        MainShapeIndex = mainShapeIndex
+                    };
+
+                    targetShapeRequest.MissingBlendData.Add(new BlendShapeDataUtil.BackgroundBlendDataRequest
+                    {
+                        ShapeName = shapeName,
+                        ShapeIndex = shapeIndex
+                    });
+
+                    if (request.CreationMode == NewActiveBlendShapeWeightMode.AutoCalculate)
+                    {
+                        requiredDeltaIndices.Add(mainShapeIndex);
+                        requiredDeltaIndices.Add(shapeIndex);
+                    }
+                }
+
+                if (targetShapeRequest != null)
+                {
+                    request.TargetShapeRequests.Add(targetShapeRequest);
+                }
+            }
+
+            if (request.CreationMode == NewActiveBlendShapeWeightMode.AutoCalculate)
+            {
+                foreach (int requiredDeltaIndex in requiredDeltaIndices)
+                {
+                    if (_blendShapeAnalysisCache.TryGetDeltaVertices(requiredDeltaIndex, out Vector3[] deltaVertices))
+                    {
+                        request.DeltaVerticesByShapeIndex.Add(requiredDeltaIndex, deltaVertices);
+                    }
+                }
+            }
+
+            if (request.DefinitionRequests.Count == 0 && request.TargetShapeRequests.Count == 0)
+            {
+                return null;
+            }
+
+            stopwatch.Stop();
+            request.MeshReadMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
+            return request;
+        }
+
+        private void LogBlendShapeSyncProfile(
+            BlendShapeDataUtil.BackgroundBlendShapeSyncRequest request,
+            BlendShapeDataUtil.BackgroundBlendShapeSyncResult result,
+            bool applied,
+            double applyMilliseconds)
+        {
+            if (request == null || result == null)
+            {
+                return;
+            }
+
+            int blendDataRequestCount = 0;
+            foreach (BlendShapeDataUtil.BackgroundTargetShapeBlendDataRequest targetShapeRequest in request.TargetShapeRequests)
+            {
+                if (targetShapeRequest != null)
+                {
+                    blendDataRequestCount += targetShapeRequest.MissingBlendData.Count;
+                }
+            }
+
+            double totalMilliseconds = request.MeshReadMilliseconds +
+                result.CalculationMilliseconds +
+                applyMilliseconds;
+            FaceBlendShapeFixDiagnostics.LogIfSlow(
+                "BlendShape sync profile",
+                totalMilliseconds,
+                $"(applied={applied}, requestedShapes={request.RequestedShapeCount}, " +
+                $"definitionRequests={request.DefinitionRequests.Count}, " +
+                $"blendDataRequests={blendDataRequestCount}, " +
+                $"cachedDeltaReads={request.DeltaVerticesByShapeIndex.Count}) " +
+                $"read mesh cost: {request.MeshReadMilliseconds:F2} ms, " +
+                $"calculation cost: {result.CalculationMilliseconds:F2} ms, " +
+                $"apply cost: {applyMilliseconds:F2} ms");
+        }
+
+        private void ApplyBlendShapeSyncResult(
+            BlendShapeDataUtil.BackgroundBlendShapeSyncRequest request,
+            BlendShapeDataUtil.BackgroundBlendShapeSyncResult result)
+        {
+            if (component == null || request == null || result == null)
+            {
+                return;
+            }
+
+            bool recordedUndo = false;
+            bool updated = false;
+
+            List<BlendShapeDefinition> definitions =
+                component.m_BlendShapeDefinitions?.ToList() ?? new List<BlendShapeDefinition>();
+            var existingDefinitionNames = new HashSet<string>(
+                definitions.Where(definition => definition != null && !string.IsNullOrEmpty(definition.m_BlendShapeName))
+                    .Select(definition => definition.m_BlendShapeName),
+                StringComparer.Ordinal);
+
+            foreach (BlendShapeDefinition definition in result.Definitions)
+            {
+                if (definition == null ||
+                    string.IsNullOrEmpty(definition.m_BlendShapeName) ||
+                    existingDefinitionNames.Contains(definition.m_BlendShapeName))
+                {
+                    continue;
+                }
+
+                if (!recordedUndo)
+                {
+                    Undo.RecordObject(component, "Sync Active BlendShape Data");
+                    recordedUndo = true;
+                }
+
+                definitions.Add(definition);
+                existingDefinitionNames.Add(definition.m_BlendShapeName);
+                updated = true;
+            }
+
+            if (updated)
+            {
+                component.m_BlendShapeDefinitions = definitions.ToArray();
+            }
+
+            TargetShape[] targetShapes = component.m_TargetShapes;
+            foreach (BlendShapeDataUtil.BackgroundTargetShapeBlendDataResult targetShapeResult in result.TargetShapeResults)
+            {
+                if (targetShapes == null ||
+                    targetShapeResult == null ||
+                    targetShapeResult.TargetShapeArrayIndex < 0 ||
+                    targetShapeResult.TargetShapeArrayIndex >= targetShapes.Length)
+                {
+                    continue;
+                }
+
+                TargetShape targetShape = targetShapes[targetShapeResult.TargetShapeArrayIndex];
+                if (targetShape == null ||
+                    targetShape.m_TargetShapeName != targetShapeResult.TargetShapeName ||
+                    !Mathf.Approximately(targetShape.m_Weight, targetShapeResult.TargetShapeWeight))
+                {
+                    continue;
+                }
+
+                List<BlendData> blendDataList = targetShape.m_BlendData?.ToList() ?? new List<BlendData>();
+                var existingBlendShapeNames = new HashSet<string>(
+                    blendDataList.Where(blendData => blendData != null && !string.IsNullOrEmpty(blendData.m_TargetShapeName))
+                        .Select(blendData => blendData.m_TargetShapeName),
+                    StringComparer.Ordinal);
+                bool updatedTargetShape = false;
+
+                foreach (BlendData blendData in targetShapeResult.BlendData)
+                {
+                    if (blendData == null ||
+                        string.IsNullOrEmpty(blendData.m_TargetShapeName) ||
+                        existingBlendShapeNames.Contains(blendData.m_TargetShapeName))
+                    {
+                        continue;
+                    }
+
+                    if (!recordedUndo)
+                    {
+                        Undo.RecordObject(component, "Sync Active BlendShape Data");
+                        recordedUndo = true;
+                    }
+
+                    blendDataList.Add(blendData);
+                    existingBlendShapeNames.Add(blendData.m_TargetShapeName);
+                    updatedTargetShape = true;
+                }
+
+                if (updatedTargetShape)
+                {
+                    targetShape.m_BlendData = blendDataList.ToArray();
+                    updated = true;
+                }
+            }
+
+            if (updated)
+            {
+                EditorUtility.SetDirty(component);
+                serializedObject.Update();
+                Repaint();
+            }
+        }
+
         private void EnsureBlendShapeDefinitionsForActiveShapes(IReadOnlyCollection<string> newActiveBlendShapes)
         {
             if (component == null || component.TargetRenderer == null || component.TargetRenderer.sharedMesh == null)
@@ -1231,9 +1801,13 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
             Mesh mesh = component.TargetRenderer.sharedMesh;
             var definitions = component.m_BlendShapeDefinitions?.ToList() ?? new List<BlendShapeDefinition>();
+            var existingDefinitionNames = new HashSet<string>(
+                definitions.Where(d => d != null && !string.IsNullOrEmpty(d.m_BlendShapeName))
+                    .Select(d => d.m_BlendShapeName));
             NewActiveBlendShapeWeightMode creationMode = component.m_NewActiveBlendShapeWeightMode;
             List<int> eyeReferences = null;
             List<int> mouthReferences = null;
+            var analysisCache = new BlendShapeDataUtil.BlendShapeAnalysisCache(mesh);
 
             if (creationMode == NewActiveBlendShapeWeightMode.AutoCalculate)
             {
@@ -1254,7 +1828,10 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
             foreach (string shapeName in newActiveBlendShapes)
             {
-                if(definitions.Any(d=>d.m_BlendShapeName == shapeName)) continue;
+                if (string.IsNullOrEmpty(shapeName) || existingDefinitionNames.Contains(shapeName))
+                {
+                    continue;
+                }
                 
                 int index = mesh.GetBlendShapeIndex(shapeName);
                 if (index == -1)
@@ -1262,6 +1839,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     continue;
                 }
                 BlendShapeDefinition definition = BlendShapeDataUtil.CreateDefaultDefinition(
+                    analysisCache,
                     component.TargetRenderer,
                     index,
                     eyeReferences,
@@ -1279,6 +1857,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     recordedUndo = true;
                 }
                 definitions.Add(definition);
+                existingDefinitionNames.Add(shapeName);
                 addedDefinition = true;
             }
 
@@ -1304,6 +1883,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             bool addedBlendData = false;
             var smr = component.TargetRenderer;
             NewActiveBlendShapeWeightMode creationMode = component.m_NewActiveBlendShapeWeightMode;
+            var analysisCache = new BlendShapeDataUtil.BlendShapeAnalysisCache(smr.sharedMesh);
             
             foreach (var targetShape in component.m_TargetShapes ?? Enumerable.Empty<TargetShape>())
             {
@@ -1322,7 +1902,8 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     targetShape,
                     newActiveBlendShapes,
                     smr,
-                    creationMode);
+                    creationMode,
+                    analysisCache);
                 if (updatedShape)
                 {
                     addedBlendData = true;
