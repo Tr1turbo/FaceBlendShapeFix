@@ -94,6 +94,7 @@ namespace Triturbo.FaceBlendShapeFix
         private struct PreviewMeshData
         {
             public Mesh Mesh;
+            public Mesh SourceMesh;
             public HashSet<string> InverseShapes;
             public HashSet<string> AdditiveShapes;
         }
@@ -185,11 +186,32 @@ namespace Triturbo.FaceBlendShapeFix
             }
 
             bool logEnabled = FaceBlendShapeFixPreviewProfiling.Enabled;
-            long startTicks = logEnabled ? Stopwatch.GetTimestamp() : 0L;
+            long startTicks = Stopwatch.GetTimestamp();
             bool meshRebuilt = false;
+            bool meshAppended = false;
             bool cacheRebuilt = false;
+            long shapeDiscoveryTicks = 0L;
+            long rebuildPreviewMeshTicks = 0L;
+            long appendPreviewMeshTicks = 0L;
+            long rebuildTargetCachesTicks = 0L;
+            int neededInverseShapeCount = 0;
+            int neededAdditiveShapeCount = 0;
+            int missingInverseShapeCount = 0;
+            int missingAdditiveShapeCount = 0;
+            bool sourceMeshChanged = false;
+            bool meshAspectChanged = (updatedAspects & RenderAspects.Mesh) != 0;
+            bool previewMeshMissing = false;
+            bool smoothWidthChanged = false;
+            string meshRebuildReason = "none";
+            string missingInvEntries = "none";
+            string missingAddEntries = "none";
+            HashSet<string> missingInvShapes = null;
+            HashSet<string> missingAddShapes = null;
 
             
+
+            _hasPreviewRequest = _component != null && _component.TryGetPreviewRequest(out _);
+            _passivePreviewEnabled = FaceBlendShapeFixEditorSettings.PassivePreviewEnabled;
 
             if(!_hasPreviewRequest && !_passivePreviewEnabled)
             {
@@ -207,52 +229,144 @@ namespace Triturbo.FaceBlendShapeFix
             using (RefreshMarker.Auto())
             {
                 // Refresh is the only place where we intentionally do the expensive work:
-                // 1. observe the current preview topology requirements
+                // 1. read the current preview topology requirements from authored data
                 // 2. rebuild the preview mesh only when the existing preview mesh no longer
                 //    covers the required split-shape sets
                 // 3. rebuild cached target metadata if either the mesh changed or authoring data changed
                 //
                 // This keeps steady-state OnFrame limited to cached numeric indices and one reusable
                 // scratch dictionary, which is the main optimization in this pass.
-                HashSet<string> neededInvShapes = context.Observe(_sourceRenderer, ComputeNeededInvShapes);
-                HashSet<string> neededAddShapes = context.Observe(_component, ComputeNeededAddShapes);
+                long shapeDiscoveryStart = Stopwatch.GetTimestamp();
+                HashSet<string> neededInvShapes = ComputeNeededInvShapes(_component);
+                HashSet<string> neededAddShapes = ComputeNeededAddShapes(_component);
                 int configurationSignature = context.Observe(_component, ComputeConfigurationSignature);
                 float currentSmoothWidth = context.Observe(_component, c => c.m_SmoothWidth);
-                _hasPreviewRequest = _component != null && _component.TryGetPreviewRequest(out _);
-                _passivePreviewEnabled = FaceBlendShapeFixEditorSettings.PassivePreviewEnabled;
+                Mesh currentSourceMesh = _sourceRenderer.sharedMesh;
+                shapeDiscoveryTicks = Stopwatch.GetTimestamp() - shapeDiscoveryStart;
+                neededInverseShapeCount = neededInvShapes.Count;
+                neededAdditiveShapeCount = neededAddShapes.Count;
+                missingInvShapes = GetMissingShapes(_previewData.InverseShapes, neededInvShapes);
+                missingAddShapes = GetMissingShapes(_previewData.AdditiveShapes, neededAddShapes);
+                missingInverseShapeCount = missingInvShapes.Count;
+                missingAdditiveShapeCount = missingAddShapes.Count;
+                sourceMeshChanged = _previewData.SourceMesh != currentSourceMesh;
+                previewMeshMissing = _previewData.Mesh == null;
+                smoothWidthChanged = Math.Abs(currentSmoothWidth - _smoothWidth) > float.Epsilon;
+                if (missingInvShapes.Count > 0)
+                {
+                    missingInvEntries = FormatMissingInverseShapeEntries(_component, missingInvShapes);
+                }
+
+                if (missingAddShapes.Count > 0)
+                {
+                    missingAddEntries = FormatMissingAdditiveShapeEntries(_component, missingAddShapes);
+                }
 
                 bool needsMeshRebuild =
-                    _previewData.Mesh == null ||
-                    (updatedAspects & RenderAspects.Mesh) != 0 ||
-                    !ShapeSetCoversRequired(_previewData.InverseShapes, neededInvShapes) ||
-                    !ShapeSetCoversRequired(_previewData.AdditiveShapes, neededAddShapes) ||
-                    Math.Abs(currentSmoothWidth - _smoothWidth) > float.Epsilon;
+                    previewMeshMissing ||
+                    sourceMeshChanged ||
+                    meshAspectChanged ||
+                    smoothWidthChanged;
+                bool needsMeshAppend =
+                    !needsMeshRebuild &&
+                    (missingInvShapes.Count > 0 || missingAddShapes.Count > 0);
 
                 _smoothWidth = currentSmoothWidth;
 
                 if (needsMeshRebuild)
                 {
                     meshRebuilt = true;
+                    meshRebuildReason = FormatMeshRebuildReason(
+                        previewMeshMissing,
+                        sourceMeshChanged,
+                        meshAspectChanged,
+                        smoothWidthChanged);
+                    long rebuildPreviewMeshStart = Stopwatch.GetTimestamp();
                     using (RebuildPreviewMeshMarker.Auto())
                     {
                         RebuildPreviewMesh(neededInvShapes, neededAddShapes);
                     }
+                    rebuildPreviewMeshTicks = Stopwatch.GetTimestamp() - rebuildPreviewMeshStart;
+                }
+                else if (needsMeshAppend)
+                {
+                    meshAppended = true;
+                    long appendPreviewMeshStart = Stopwatch.GetTimestamp();
+                    AppendPreviewMesh(missingInvShapes, missingAddShapes);
+                    appendPreviewMeshTicks = Stopwatch.GetTimestamp() - appendPreviewMeshStart;
                 }
 
                 bool needsCacheRebuild =
                     needsMeshRebuild ||
+                    needsMeshAppend ||
                     _configurationSignature != configurationSignature;
 
                 if (needsCacheRebuild)
                 {
                     cacheRebuilt = true;
                     _configurationSignature = configurationSignature;
+                    long rebuildTargetCachesStart = Stopwatch.GetTimestamp();
                     using (RebuildTargetCachesMarker.Auto())
                     {
                         RebuildTargetCaches();
                     }
+                    rebuildTargetCachesTicks = Stopwatch.GetTimestamp() - rebuildTargetCachesStart;
                 }
             }
+
+            double refreshMilliseconds = FaceBlendShapeFixDiagnostics.ToMilliseconds(Stopwatch.GetTimestamp() - startTicks);
+            double shapeDiscoveryMilliseconds = FaceBlendShapeFixDiagnostics.ToMilliseconds(shapeDiscoveryTicks);
+            double rebuildPreviewMeshMilliseconds = FaceBlendShapeFixDiagnostics.ToMilliseconds(rebuildPreviewMeshTicks);
+            double appendPreviewMeshMilliseconds = FaceBlendShapeFixDiagnostics.ToMilliseconds(appendPreviewMeshTicks);
+            double rebuildTargetCachesMilliseconds = FaceBlendShapeFixDiagnostics.ToMilliseconds(rebuildTargetCachesTicks);
+
+            FaceBlendShapeFixDiagnostics.LogIfSlow(
+                "Preview refresh",
+                refreshMilliseconds,
+                $"meshRebuilt={meshRebuilt}, meshAppended={meshAppended}, cacheRebuilt={cacheRebuilt}, " +
+                $"meshAspectChanged={meshAspectChanged}, sourceMeshChanged={sourceMeshChanged}, " +
+                $"previewMeshMissing={previewMeshMissing}, smoothWidthChanged={smoothWidthChanged}, " +
+                $"meshRebuildReason={meshRebuildReason}, " +
+                $"neededInv={neededInverseShapeCount}, neededAdd={neededAdditiveShapeCount}, " +
+                $"missingInv={missingInverseShapeCount}, missingAdd={missingAdditiveShapeCount}, " +
+                $"missingInvNames={FormatShapeSet(missingInvShapes)}, " +
+                $"missingAddNames={FormatShapeSet(missingAddShapes)}, " +
+                $"missingInvEntries={missingInvEntries}, " +
+                $"missingAddEntries={missingAddEntries}, " +
+                $"cachedTargets={_targetCaches.Count}, " +
+                $"shapeDiscovery={shapeDiscoveryMilliseconds:F2} ms, " +
+                $"meshRebuild={rebuildPreviewMeshMilliseconds:F2} ms, " +
+                $"meshAppend={appendPreviewMeshMilliseconds:F2} ms, " +
+                $"cacheRebuild={rebuildTargetCachesMilliseconds:F2} ms");
+
+            FaceBlendShapeFixDiagnostics.LogIfSlow(
+                "Preview mesh rebuild",
+                rebuildPreviewMeshMilliseconds,
+                $"renderer={_sourceRenderer.name}, vertices={_sourceRenderer.sharedMesh?.vertexCount ?? 0}, " +
+                $"blendShapes={_sourceRenderer.sharedMesh?.blendShapeCount ?? 0}, " +
+                $"reason={meshRebuildReason}, neededInv={neededInverseShapeCount}, neededAdd={neededAdditiveShapeCount}, " +
+                $"missingInvNames={FormatShapeSet(missingInvShapes)}, missingAddNames={FormatShapeSet(missingAddShapes)}, " +
+                $"missingInvEntries={missingInvEntries}, missingAddEntries={missingAddEntries}",
+                thresholdMilliseconds: 4d);
+
+            FaceBlendShapeFixDiagnostics.LogIfSlow(
+                "Preview mesh append",
+                appendPreviewMeshMilliseconds,
+                $"renderer={_sourceRenderer.name}, vertices={_sourceRenderer.sharedMesh?.vertexCount ?? 0}, " +
+                $"blendShapes={_sourceRenderer.sharedMesh?.blendShapeCount ?? 0}, " +
+                $"missingInv={missingInverseShapeCount}, missingAdd={missingAdditiveShapeCount}, " +
+                $"missingInvNames={FormatShapeSet(missingInvShapes)}, " +
+                $"missingAddNames={FormatShapeSet(missingAddShapes)}, " +
+                $"missingInvEntries={missingInvEntries}, " +
+                $"missingAddEntries={missingAddEntries}",
+                thresholdMilliseconds: 4d);
+
+            FaceBlendShapeFixDiagnostics.LogIfSlow(
+                "Preview cache rebuild",
+                rebuildTargetCachesMilliseconds,
+                $"renderer={_sourceRenderer.name}, targetCaches={_targetCaches.Count}, " +
+                $"generatedBlendShapes={_generatedBlendShapeIndices.Count}",
+                thresholdMilliseconds: 4d);
 
             if (logEnabled)
             {
@@ -273,8 +387,9 @@ namespace Triturbo.FaceBlendShapeFix
             }
 
             bool logEnabled = FaceBlendShapeFixPreviewProfiling.Enabled;
-            long startTicks = logEnabled ? Stopwatch.GetTimestamp() : 0L;
+            long startTicks = Stopwatch.GetTimestamp();
             int appliedTargetCount = 0;
+            int weightsWritten = 0;
             PreviewRequest previewRequest = default;
             _hasPreviewRequest = _component != null && _component.TryGetPreviewRequest(out previewRequest);
             _passivePreviewEnabled = FaceBlendShapeFixEditorSettings.PassivePreviewEnabled;
@@ -286,6 +401,11 @@ namespace Triturbo.FaceBlendShapeFix
                 // proxy visually inert by not assigning the preview mesh and by skipping all cached work.
                 string skipShapeName = null;
                 TargetCache previewTargetCache = null;
+
+                if (_hasPreviewRequest)
+                {
+                    EnsureExplicitPreviewRequestReady();
+                }
 
                 if (_hasPreviewRequest &&
                     TryGetPreviewTargetCache(previewRequest, out previewTargetCache))
@@ -340,6 +460,7 @@ namespace Triturbo.FaceBlendShapeFix
                         appliedTargetCount++;
                     }
 
+                    weightsWritten = _scratchWeights.Count;
                     foreach (KeyValuePair<int, float> weight in _scratchWeights)
                     {
                         proxySmr.SetBlendShapeWeight(weight.Key, weight.Value);
@@ -355,6 +476,13 @@ namespace Triturbo.FaceBlendShapeFix
                     _targetCaches.Count,
                     _generatedBlendShapeIndices.Count);
             }
+
+            FaceBlendShapeFixDiagnostics.LogIfSlow(
+                "Preview on-frame",
+                FaceBlendShapeFixDiagnostics.ToMilliseconds(Stopwatch.GetTimestamp() - startTicks),
+                $"renderer={_sourceRenderer.name}, appliedTargets={appliedTargetCount}, " +
+                $"cachedTargets={_targetCaches.Count}, generatedBlendShapes={_generatedBlendShapeIndices.Count}, " +
+                $"weightsWritten={weightsWritten}");
         }
 
         #endregion
@@ -556,6 +684,11 @@ namespace Triturbo.FaceBlendShapeFix
                     continue;
                 }
 
+                if (!HasAnyWeight(data))
+                {
+                    continue;
+                }
+
                 // All native GetBlendShapeIndex(string) calls and suffix-name construction are moved
                 // here so the steady-state frame loop never pays repeated O(n) name resolution costs.
                 int baseIndex = previewMesh.GetBlendShapeIndex(data.m_TargetShapeName);
@@ -601,6 +734,11 @@ namespace Triturbo.FaceBlendShapeFix
                     continue;
                 }
 
+                if (!TryGetEffectiveAdditiveWeights(data, out float leftWeight, out float rightWeight))
+                {
+                    continue;
+                }
+
                 // Additive suffix resolution is also flattened up front. OnFrame receives only the
                 // left/right numeric targets and the final multipliers to accumulate.
                 string rightName = data.m_TargetShapeName + ".add.R";
@@ -616,8 +754,8 @@ namespace Triturbo.FaceBlendShapeFix
                 {
                     LeftIndex = leftIndex,
                     RightIndex = rightIndex,
-                    LeftWeight = data.m_SplitLeftRight ? data.m_LeftWeight : data.m_Weight,
-                    RightWeight = data.m_SplitLeftRight ? data.m_RightWeight : data.m_Weight
+                    LeftWeight = leftWeight,
+                    RightWeight = rightWeight
                 });
             }
 
@@ -653,25 +791,44 @@ namespace Triturbo.FaceBlendShapeFix
         #region Preview Mesh Management
 
         /// <summary>
-        /// Computes which blend shapes need .inv shapes (active non-target shapes)
+        /// Computes which blend shapes need .inv shapes for the authored target configuration.
+        /// This stays stable while live source weights animate, which avoids mesh rebuild churn.
         /// </summary>
-        private static HashSet<string> ComputeNeededInvShapes(SkinnedMeshRenderer source)
+        private static HashSet<string> ComputeNeededInvShapes(FaceBlendShapeFixComponent component)
         {
             var result = new HashSet<string>(NameComparer);
-            Mesh mesh = source != null ? source.sharedMesh : null;
-            if (mesh == null)
+            if (component?.m_TargetShapes == null)
             {
                 return result;
             }
 
-            for (int i = 0; i < mesh.blendShapeCount; i++)
+            IReadOnlyDictionary<string, BlendShapeDefinition> definitionLookup =
+                BuildDefinitionLookup(component.m_BlendShapeDefinitions);
+
+            foreach (TargetShape targetShape in component.m_TargetShapes)
             {
-                string name = mesh.GetBlendShapeName(i);
-                if (source.GetBlendShapeWeight(i) > 0f)
+                if (targetShape?.m_BlendData == null || targetShape.m_BlendData.Length == 0)
                 {
-                    result.Add(name);
+                    continue;
+                }
+
+                IReadOnlyList<BlendData> resolvedBlendData = targetShape.GetBlendData(definitionLookup);
+                if (resolvedBlendData == null)
+                {
+                    continue;
+                }
+
+                foreach (BlendData data in resolvedBlendData)
+                {
+                    if (data == null || string.IsNullOrEmpty(data.m_TargetShapeName) || !HasAnyWeight(data))
+                    {
+                        continue;
+                    }
+
+                    result.Add(data.m_TargetShapeName);
                 }
             }
+
             return result;
         }
 
@@ -695,7 +852,8 @@ namespace Triturbo.FaceBlendShapeFix
 
                 foreach (BlendData data in targetShape.m_AdditiveBlendData)
                 {
-                    if (!string.IsNullOrEmpty(data?.m_TargetShapeName))
+                    if (!string.IsNullOrEmpty(data?.m_TargetShapeName) &&
+                        TryGetEffectiveAdditiveWeights(data, out _, out _))
                     {
                         result.Add(data.m_TargetShapeName);
                     }
@@ -704,19 +862,268 @@ namespace Triturbo.FaceBlendShapeFix
             return result;
         }
 
-        private static bool ShapeSetCoversRequired(HashSet<string> available, HashSet<string> required)
+        private static bool HasAnyWeight(BlendData data)
         {
-            if (required == null || required.Count == 0)
-            {
-                return true;
-            }
-
-            if (available == null || available.Count < required.Count)
+            if (data == null)
             {
                 return false;
             }
 
-            return available.IsSupersetOf(required);
+            return !Mathf.Approximately(data.m_Weight, 0f) ||
+                   !Mathf.Approximately(data.m_LeftWeight, 0f) ||
+                   !Mathf.Approximately(data.m_RightWeight, 0f);
+        }
+
+        private static string FormatMeshRebuildReason(
+            bool previewMeshMissing,
+            bool sourceMeshChanged,
+            bool meshAspectChanged,
+            bool smoothWidthChanged)
+        {
+            var reasons = new List<string>(4);
+            if (previewMeshMissing)
+            {
+                reasons.Add("previewMeshMissing");
+            }
+
+            if (sourceMeshChanged)
+            {
+                reasons.Add("sourceMeshChanged");
+            }
+
+            if (meshAspectChanged)
+            {
+                reasons.Add("meshAspectChanged");
+            }
+
+            if (smoothWidthChanged)
+            {
+                reasons.Add("smoothWidthChanged");
+            }
+
+            return reasons.Count == 0 ? "none" : string.Join("|", reasons);
+        }
+
+        private static string FormatMissingInverseShapeEntries(
+            FaceBlendShapeFixComponent component,
+            HashSet<string> missingShapes,
+            int maxCount = 8)
+        {
+            if (component?.m_TargetShapes == null || missingShapes == null || missingShapes.Count == 0)
+            {
+                return "none";
+            }
+
+            IReadOnlyDictionary<string, BlendShapeDefinition> definitionLookup =
+                BuildDefinitionLookup(component.m_BlendShapeDefinitions);
+            var entries = new List<string>(Math.Min(missingShapes.Count, maxCount));
+            int totalCount = 0;
+
+            for (int targetIndex = 0; targetIndex < component.m_TargetShapes.Length; targetIndex++)
+            {
+                TargetShape targetShape = component.m_TargetShapes[targetIndex];
+                BlendData[] blendDataArray = targetShape?.m_BlendData;
+                if (targetShape == null || blendDataArray == null)
+                {
+                    continue;
+                }
+
+                for (int dataIndex = 0; dataIndex < blendDataArray.Length; dataIndex++)
+                {
+                    BlendData data = blendDataArray[dataIndex];
+                    if (!TryResolveInverseBlendData(
+                            targetShape,
+                            data,
+                            definitionLookup,
+                            out BlendData effectiveData,
+                            out bool fromGlobalDefinition) ||
+                        string.IsNullOrEmpty(effectiveData.m_TargetShapeName) ||
+                        !missingShapes.Contains(effectiveData.m_TargetShapeName) ||
+                        !HasAnyWeight(effectiveData))
+                    {
+                        continue;
+                    }
+
+                    totalCount++;
+                    if (entries.Count >= maxCount)
+                    {
+                        continue;
+                    }
+
+                    entries.Add(
+                        $"target[{targetIndex}] '{FormatName(targetShape.m_TargetShapeName)}' " +
+                        $"m_BlendData[{dataIndex}] -> '{FormatName(effectiveData.m_TargetShapeName)}' " +
+                        $"({(fromGlobalDefinition ? "globalDefinition" : "local")}, {FormatWeights(effectiveData)})");
+                }
+            }
+
+            return FormatEntryList(entries, totalCount);
+        }
+
+        private static string FormatMissingAdditiveShapeEntries(
+            FaceBlendShapeFixComponent component,
+            HashSet<string> missingShapes,
+            int maxCount = 8)
+        {
+            if (component?.m_TargetShapes == null || missingShapes == null || missingShapes.Count == 0)
+            {
+                return "none";
+            }
+
+            var entries = new List<string>(Math.Min(missingShapes.Count, maxCount));
+            int totalCount = 0;
+
+            for (int targetIndex = 0; targetIndex < component.m_TargetShapes.Length; targetIndex++)
+            {
+                TargetShape targetShape = component.m_TargetShapes[targetIndex];
+                BlendData[] blendDataArray = targetShape?.m_AdditiveBlendData;
+                if (targetShape == null || blendDataArray == null)
+                {
+                    continue;
+                }
+
+                for (int dataIndex = 0; dataIndex < blendDataArray.Length; dataIndex++)
+                {
+                    BlendData data = blendDataArray[dataIndex];
+                    if (data == null ||
+                        string.IsNullOrEmpty(data.m_TargetShapeName) ||
+                        !missingShapes.Contains(data.m_TargetShapeName) ||
+                        !TryGetEffectiveAdditiveWeights(data, out float leftWeight, out float rightWeight))
+                    {
+                        continue;
+                    }
+
+                    totalCount++;
+                    if (entries.Count >= maxCount)
+                    {
+                        continue;
+                    }
+
+                    entries.Add(
+                        $"target[{targetIndex}] '{FormatName(targetShape.m_TargetShapeName)}' " +
+                        $"m_AdditiveBlendData[{dataIndex}] -> '{FormatName(data.m_TargetShapeName)}' " +
+                        $"(L={leftWeight:F3}, R={rightWeight:F3})");
+                }
+            }
+
+            return FormatEntryList(entries, totalCount);
+        }
+
+        private static bool TryResolveInverseBlendData(
+            TargetShape targetShape,
+            BlendData data,
+            IReadOnlyDictionary<string, BlendShapeDefinition> definitionLookup,
+            out BlendData effectiveData,
+            out bool fromGlobalDefinition)
+        {
+            effectiveData = null;
+            fromGlobalDefinition = false;
+            if (targetShape == null || data == null || string.IsNullOrEmpty(data.m_TargetShapeName))
+            {
+                return false;
+            }
+
+            if (data.m_TargetShapeName == targetShape.m_TargetShapeName)
+            {
+                return false;
+            }
+
+            if (definitionLookup != null &&
+                definitionLookup.TryGetValue(data.m_TargetShapeName, out BlendShapeDefinition definition))
+            {
+                if (definition.m_Protected)
+                {
+                    return false;
+                }
+
+                if (targetShape.m_UseGlobalDefinitions)
+                {
+                    effectiveData = definition.ResolveBlendData(targetShape.m_TargetShapeType);
+                    fromGlobalDefinition = true;
+                    return effectiveData != null;
+                }
+            }
+
+            effectiveData = data;
+            return true;
+        }
+
+        private static bool TryGetEffectiveAdditiveWeights(BlendData data, out float leftWeight, out float rightWeight)
+        {
+            leftWeight = 0f;
+            rightWeight = 0f;
+            if (data == null)
+            {
+                return false;
+            }
+
+            leftWeight = data.m_SplitLeftRight ? data.m_LeftWeight : data.m_Weight;
+            rightWeight = data.m_SplitLeftRight ? data.m_RightWeight : data.m_Weight;
+            return !Mathf.Approximately(leftWeight, 0f) || !Mathf.Approximately(rightWeight, 0f);
+        }
+
+        private static string FormatEntryList(List<string> entries, int totalCount)
+        {
+            if (entries == null || totalCount == 0)
+            {
+                return "none";
+            }
+
+            return totalCount > entries.Count
+                ? $"{string.Join("; ", entries)} (+{totalCount - entries.Count} more)"
+                : string.Join("; ", entries);
+        }
+
+        private static string FormatWeights(BlendData data)
+        {
+            return $"w={data.m_Weight:F3}, L={data.m_LeftWeight:F3}, R={data.m_RightWeight:F3}";
+        }
+
+        private static string FormatName(string value)
+        {
+            return string.IsNullOrEmpty(value) ? "<empty>" : value;
+        }
+
+        private static HashSet<string> GetMissingShapes(HashSet<string> available, HashSet<string> required)
+        {
+            if (required == null || required.Count == 0)
+            {
+                return new HashSet<string>(NameComparer);
+            }
+
+            if (available == null || available.Count == 0)
+            {
+                return CloneShapeSet(required);
+            }
+
+            var missing = new HashSet<string>(required, NameComparer);
+            missing.ExceptWith(available);
+            return missing;
+        }
+
+        private static string FormatShapeSet(HashSet<string> shapes, int maxCount = 8)
+        {
+            if (shapes == null || shapes.Count == 0)
+            {
+                return "none";
+            }
+
+            var names = new List<string>(Math.Min(shapes.Count, maxCount));
+            int count = 0;
+            foreach (string shapeName in shapes)
+            {
+                if (count >= maxCount)
+                {
+                    break;
+                }
+
+                names.Add(shapeName);
+                count++;
+            }
+
+            return shapes.Count > maxCount
+                ? $"{string.Join(", ", names)} (+{shapes.Count - maxCount} more)"
+                : string.Join(", ", names);
         }
 
         private static HashSet<string> CloneShapeSet(HashSet<string> source)
@@ -833,16 +1240,85 @@ namespace Triturbo.FaceBlendShapeFix
 
             _previewData.InverseShapes = CloneShapeSet(inverseShapes);
             _previewData.AdditiveShapes = CloneShapeSet(additiveShapes);
+            _previewData.SourceMesh = mesh;
 
             if (mesh == null)
             {
                 return;
             }
 
-            // Rebuilds materialize the currently required generated shapes. Refresh may skip this
-            // work when the existing preview mesh already covers the required names, which keeps
-            // shrinking requirement sets from forcing immediate mesh churn.
+            // Rebuilds materialize the generated shapes required by the current authored config.
+            // Refresh may skip this work when the existing preview mesh already covers those names.
             _previewData.Mesh = PreviewMeshBuilder.BuildPreviewMesh(mesh, inverseShapes, additiveShapes, _smoothWidth);
+        }
+
+        private void EnsureExplicitPreviewRequestReady()
+        {
+            Mesh currentSourceMesh = _sourceRenderer.sharedMesh;
+            if (currentSourceMesh == null)
+            {
+                return;
+            }
+
+            HashSet<string> neededInvShapes = ComputeNeededInvShapes(_component);
+            HashSet<string> neededAddShapes = ComputeNeededAddShapes(_component);
+            HashSet<string> missingInvShapes = GetMissingShapes(_previewData.InverseShapes, neededInvShapes);
+            HashSet<string> missingAddShapes = GetMissingShapes(_previewData.AdditiveShapes, neededAddShapes);
+            float currentSmoothWidth = _component.m_SmoothWidth;
+            bool previewMeshMissing = _previewData.Mesh == null;
+            bool sourceMeshChanged = _previewData.SourceMesh != currentSourceMesh;
+            bool smoothWidthChanged = Math.Abs(currentSmoothWidth - _smoothWidth) > float.Epsilon;
+            bool needsMeshRebuild =
+                previewMeshMissing ||
+                sourceMeshChanged ||
+                smoothWidthChanged;
+            bool needsMeshAppend =
+                !needsMeshRebuild &&
+                (missingInvShapes.Count > 0 || missingAddShapes.Count > 0);
+            int configurationSignature = ComputeConfigurationSignature(_component);
+            bool needsCacheRebuild =
+                needsMeshRebuild ||
+                needsMeshAppend ||
+                _configurationSignature != configurationSignature;
+
+            if (!needsCacheRebuild)
+            {
+                return;
+            }
+
+            _smoothWidth = currentSmoothWidth;
+            if (needsMeshRebuild)
+            {
+                RebuildPreviewMesh(neededInvShapes, neededAddShapes);
+            }
+            else if (needsMeshAppend)
+            {
+                AppendPreviewMesh(missingInvShapes, missingAddShapes);
+            }
+
+            _configurationSignature = configurationSignature;
+            RebuildTargetCaches();
+        }
+
+        private void AppendPreviewMesh(HashSet<string> inverseShapes, HashSet<string> additiveShapes)
+        {
+            if (_previewData.Mesh == null || _sourceRenderer.sharedMesh == null)
+            {
+                return;
+            }
+
+            _previewData.InverseShapes ??= new HashSet<string>(NameComparer);
+            _previewData.AdditiveShapes ??= new HashSet<string>(NameComparer);
+            _previewData.InverseShapes.UnionWith(inverseShapes);
+            _previewData.AdditiveShapes.UnionWith(additiveShapes);
+            _previewData.SourceMesh = _sourceRenderer.sharedMesh;
+
+            PreviewMeshBuilder.AppendPreviewShapes(
+                _sourceRenderer.sharedMesh,
+                _previewData.Mesh,
+                inverseShapes,
+                additiveShapes,
+                _smoothWidth);
         }
 
         #endregion
