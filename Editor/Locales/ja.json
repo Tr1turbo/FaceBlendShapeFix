@@ -46,6 +46,8 @@
     "editor.preview.exit": "プレビュー終了",
     "editor.preview.passive_preview": "パッシブプレビュー",
     "editor.preview.passive_preview.tooltip": "グローバルなエディター設定です。有効な場合、Preview を押さなくてもターゲットレンダラーの現在のシェイプキー値に追従してプレビューします。無効にすると、プレビューボタンまたはスライダー操作時のみプレビューします。",
+    "editor.diagnostics_logging": "診断ログ",
+    "editor.diagnostics_logging.tooltip": "グローバルなエディター設定です。有効にすると、トラブルシュート用に遅いエディター処理を Console に記録します。",
     "editor.blend_data_scroll_enabled": "Blend Data スクロール",
     "editor.blend_data_scroll_enabled.tooltip": "グローバルなエディター設定です。有効にすると、長い Blend Data リストをスクロール領域内に表示します。",
     "editor.blend_data_scroll_height": "Blend Data スクロール高さ",

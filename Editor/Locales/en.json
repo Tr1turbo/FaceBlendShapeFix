@@ -46,6 +46,8 @@
     "editor.preview.exit": "Exit Preview",
     "editor.preview.passive_preview": "Passive Preview",
     "editor.preview.passive_preview.tooltip": "Global editor setting. When enabled, preview follows the target renderer's live blendshape weights without pressing Preview. Disable this to preview only from the Preview button or slider.",
+    "editor.diagnostics_logging": "Diagnostics Logging",
+    "editor.diagnostics_logging.tooltip": "Global editor setting. When enabled, slow editor operations are logged to the Console for troubleshooting.",
     "editor.blend_data_scroll_enabled": "Blend Data Scroll",
     "editor.blend_data_scroll_enabled.tooltip": "Global editor setting. When enabled, long Blend Data lists are shown inside a scroll view.",
     "editor.blend_data_scroll_height": "Blend Data Scroll Height",
