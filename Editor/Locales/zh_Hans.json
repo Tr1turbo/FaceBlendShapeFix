@@ -46,6 +46,8 @@
     "editor.preview.exit": "退出预览",
     "editor.preview.passive_preview": "被动预览",
     "editor.preview.passive_preview.tooltip": "全局编辑器设置。启用时，即使不按下预览，也会根据目标渲染器当前的形态键权重显示预览。禁用后，只有使用预览按钮或滑块时才会预览。",
+    "editor.diagnostics_logging": "诊断日志",
+    "editor.diagnostics_logging.tooltip": "全局编辑器设置。启用后，会将较慢的编辑器操作记录到 Console 以便排查问题。",
     "editor.blend_data_scroll_enabled": "Blend Data 滚动",
     "editor.blend_data_scroll_enabled.tooltip": "全局编辑器设置。启用后，较长的 Blend Data 列表会显示在可滚动区域中。",
     "editor.blend_data_scroll_height": "Blend Data 滚动高度",
