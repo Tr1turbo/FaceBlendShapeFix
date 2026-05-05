@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -16,6 +17,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         }
         
         public event Action<BlendShapeChange> OnActiveBlendShapesChanged;
+        public event Action OnBlendShapeWeightsEdited;
         
         private SkinnedMeshRenderer _renderer;
 
@@ -73,6 +75,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 if (renderer != _renderer)
                     continue;
 
+                OnBlendShapeWeightsEdited?.Invoke();
                 Refresh();
                 break;
             }
@@ -85,19 +88,34 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         /// </summary>
         public void Refresh()
         {
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            int blendShapeCount = _renderer != null && _renderer.sharedMesh != null
+                ? _renderer.sharedMesh.blendShapeCount
+                : 0;
+
             if (_renderer == null || _renderer.sharedMesh == null)
+            {
+                ClearCurrentActive();
+                NotifyIfChanged();
+                stopwatch.Stop();
+                FaceBlendShapeFixDiagnostics.LogIfSlow(
+                    "Activation observer refresh",
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    $"renderer=null, blendShapes={blendShapeCount}, active=0",
+                    thresholdMilliseconds: 4d);
                 return;
-            
+            }
+
             UpdateCurrentActive();
-            
-            if (!HasChanged())
-                return;
-            
-            var change = ComputeChange();
-            
-            OnActiveBlendShapesChanged?.Invoke(change);
+            NotifyIfChanged();
+            stopwatch.Stop();
+            FaceBlendShapeFixDiagnostics.LogIfSlow(
+                "Activation observer refresh",
+                stopwatch.Elapsed.TotalMilliseconds,
+                $"renderer={_renderer.name}, blendShapes={blendShapeCount}, active={_currentActive.Count}",
+                thresholdMilliseconds: 4d);
         }
-        
+
         private void UpdateCurrentActive()
         {
             _currentWeights.Clear();
@@ -117,7 +135,24 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 _currentActive.Add(name);
             }
         }
-        
+
+        private void ClearCurrentActive()
+        {
+            _currentWeights.Clear();
+            _currentActive.Clear();
+        }
+
+        private void NotifyIfChanged()
+        {
+            if (!HasChanged())
+            {
+                return;
+            }
+
+            BlendShapeChange change = ComputeChange();
+            OnActiveBlendShapesChanged?.Invoke(change);
+        }
+
         
         private bool HasChanged()
         {

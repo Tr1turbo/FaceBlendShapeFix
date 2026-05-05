@@ -20,6 +20,8 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         private SerializedProperty definitionsProperty;
         private ReorderableList activeDefinitionList;
 
+        internal bool HasActiveDefinition => activeDefinitionIndices.Count > 0;
+
         public BlendShapeDefinitionDrawer(FaceBlendShapeFixEditor editor)
         {
             this.editor = editor;
@@ -44,31 +46,52 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
         public void Draw(HashSet<string> activeBlendShapes)
         {
-            if (definitionsProperty == null ||
-                activeDefinitionList == null ||
-                activeBlendShapes == null ||
-                activeBlendShapes.Count == 0)
+            if (definitionsProperty == null || activeDefinitionList == null)
             {
                 return;
             }
 
+            activeBlendShapes ??= new HashSet<string>();
+
             Rect rect = EditorGUILayout.GetControlRect();
-            
-            
             var label = EditorGUI.BeginProperty(rect, L.G("editor.blend_shape_definitions"), definitionsProperty);
-            
-            
+
             definitionsProperty.isExpanded = EditorGUI.BeginFoldoutHeaderGroup(rect, definitionsProperty.isExpanded, label);
             if (definitionsProperty.isExpanded)
             {
                 UpdateActiveIndices(activeBlendShapes);
-                if (activeDefinitionIndices.Count > 0)
+
+                if (!HasValidTargetRenderer())
+                {
+                    EditorGUILayout.HelpBox(
+                        L.Get("editor.blend_shape_definitions.help.no_renderer"),
+                        MessageType.Warning);
+                }
+                else if (activeBlendShapes.Count == 0)
+                {
+                    EditorGUILayout.HelpBox(
+                        L.Get("editor.blend_shape_definitions.help.no_active_blendshapes"),
+                        MessageType.Info);
+                }
+                else if (activeDefinitionIndices.Count > 0)
                 {
                     using (new EditorGUI.DisabledScope(editor == null || editor.component == null))
                     {
                         DrawDefinitionBulkButtons();
                         activeDefinitionList.DoLayoutList();
                     }
+                }
+                else if (!CanAutoCalculateDefinitions())
+                {
+                    EditorGUILayout.HelpBox(
+                        L.Get("editor.blend_shape_definitions.help.missing_reference_targets"),
+                        MessageType.Warning);
+                }
+                else
+                {
+                    EditorGUILayout.HelpBox(
+                        L.Get("editor.blend_shape_definitions.help.no_matching_definitions"),
+                        MessageType.Info);
                 }
             }
             EditorGUI.EndFoldoutHeaderGroup();
@@ -110,6 +133,14 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         private static void DrawHeader(Rect rect)
         {
             EditorGUI.LabelField(rect, L.Get("editor.active_blend_shape_definitions"));
+        }
+
+        private bool HasValidTargetRenderer()
+        {
+            // Do not use `editor?.component?.TargetRenderer?.sharedMesh`
+            // Prevent renderer fake null
+            var renderer = editor?.component?.TargetRenderer;
+            return renderer != null && renderer.sharedMesh != null;
         }
 
         private float GetElementHeight(int index)
@@ -312,6 +343,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             int undoGroup = Undo.GetCurrentGroup();
             Undo.SetCurrentGroupName("Auto Calculate BlendShape Definitions");
             Undo.RecordObject(serializedObject.targetObject, "Auto Calculate BlendShape Definitions");
+            var analysisCache = new BlendShapeDataUtil.BlendShapeAnalysisCache(mesh);
             foreach (int index in activeDefinitionIndices)
             {
                 SerializedProperty element = definitionsProperty.GetArrayElementAtIndex(index);
@@ -333,6 +365,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                 }
 
                 BlendShapeDefinition calculated = BlendShapeDataUtil.CreateDefinition(
+                    analysisCache,
                     smr,
                     shapeIndex,
                     eyeReferences,

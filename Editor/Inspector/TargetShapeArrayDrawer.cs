@@ -141,6 +141,9 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         /// <summary>Delegate invoked to draw the category selector UI for a target shape.</summary>
         internal Action<SerializedProperty> DrawCategorySelector;
 
+        /// <summary>Delegate invoked when a target shape type value changes in the inspector.</summary>
+        internal Action OnTargetShapeTypeChanged;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="TargetShapeArrayDrawer"/> class.
         /// </summary>
@@ -333,7 +336,12 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
                 Rect typeRect = new Rect(currentRect.x, currentRect.y, typeWidth, currentRect.height);
 
+                EditorGUI.BeginChangeCheck();
                 L.LocalizedEnumPropertyField(typeRect, targetShapeTypeProp, L.G("editor.target_shape_type"), "enum.shapetype");
+                if (EditorGUI.EndChangeCheck())
+                {
+                    OnTargetShapeTypeChanged?.Invoke();
+                }
                 Widgets.ToggleButton(toggleRect, useGlobalDefinitionsProp, useGlobalLabelOn, useGlobalLabelOff);
             }
             else
@@ -376,8 +384,8 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     }
                     else
                     {
-                        bool allowScroll = _component?.m_InspectorSettings?.m_EnableBlendDataScroll ?? true;
-                        float scrollHeight = Mathf.Max(64f, _component?.m_InspectorSettings?.m_BlendDataScrollHeight ?? 240f);
+                        bool allowScroll = FaceBlendShapeFixEditorSettings.BlendDataScrollEnabled;
+                        float scrollHeight = FaceBlendShapeFixEditorSettings.BlendDataScrollHeight;
                         bool useScroll = allowScroll && blendDataVisibility._listHeight > scrollHeight;
                         string scrollKey = targetShapeProp.propertyPath;
                         bool isUpdated = false;
@@ -399,7 +407,8 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
                         if (isUpdated && isCurrentPreview)
                         {
-                            SceneView.RepaintAll();
+                            // If use SceneView.RepaintAll() no update when no scene.
+                            InternalEditorUtility.RepaintAllViews();
                         }
                     }
                     
@@ -647,12 +656,12 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
 
             if (GUI.Button(setZeroRect, SetAllZeroContent))
             {
-                ApplyBlendDataWeights(targetShape, blendDataArray, _ => 0f);
+                ApplyBlendDataWeights(targetShape, blendDataArray, _ => 0f, clearSplitLeftRight: true);
             }
 
             if (GUI.Button(setOneRect, SetAllOneContent))
             {
-                ApplyBlendDataWeights(targetShape, blendDataArray, _ => 1f);
+                ApplyBlendDataWeights(targetShape, blendDataArray, _ => 1f, clearSplitLeftRight: true);
             }
 
             if (GUI.Button(setNonZeroOneRect, SetNonZeroOneContent))
@@ -747,6 +756,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             IReadOnlyDictionary<string, BlendShapeDefinition> definitions = GetDefinitionLookup();
 
             float mainWeight = targetShape.FindPropertyRelative(nameof(TargetShape.m_Weight)).floatValue;
+            var analysisCache = new BlendShapeDataUtil.BlendShapeAnalysisCache(mesh);
 
             int undoGroup = Undo.GetCurrentGroup();
             Undo.SetCurrentGroupName("Auto Calculate Blend Data");
@@ -776,7 +786,12 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
                     continue;
                 }
 
-                BlendData calculated = BlendShapeDataUtil.CreateBlendData(smr, mainShapeIndex, blendIndex, mainWeight);
+                BlendData calculated = BlendShapeDataUtil.CreateBlendData(
+                    analysisCache,
+                    smr,
+                    mainShapeIndex,
+                    blendIndex,
+                    mainWeight);
                 if (calculated == null)
                 {
                     continue;
@@ -829,12 +844,17 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         }
 
         /// <summary>
-        /// Applies a weight transform across all blend data entries, respecting protected entries.
+        /// Applies a weight transform across all blend data entries, respecting protected weight edits.
         /// </summary>
         /// <param name="targetShape">Serialized target shape property.</param>
         /// <param name="blendDataArray">Serialized blend data array property.</param>
         /// <param name="weightFunc">Function to remap weights.</param>
-        private void ApplyBlendDataWeights(SerializedProperty targetShape, SerializedProperty blendDataArray, Func<float, float> weightFunc)
+        /// <param name="clearSplitLeftRight">Whether to clear split-left-right flags on all entries.</param>
+        private void ApplyBlendDataWeights(
+            SerializedProperty targetShape,
+            SerializedProperty blendDataArray,
+            Func<float, float> weightFunc,
+            bool clearSplitLeftRight = false)
         {
             if (blendDataArray == null || weightFunc == null)
             {
@@ -855,7 +875,7 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             {
                 SerializedProperty element = blendDataArray.GetArrayElementAtIndex(i);
                 bool isProtected = IsProtectedBlendData(definitions, element);
-                ApplyBlendDataWeightToElement(element, weightFunc, isProtected);
+                ApplyBlendDataWeightToElement(element, weightFunc, isProtected, clearSplitLeftRight);
             }
 
             serializedObject.ApplyModifiedProperties();
@@ -867,16 +887,15 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
         /// </summary>
         /// <param name="element">Serialized blend data element.</param>
         /// <param name="weightFunc">Function to remap weights.</param>
-        /// <param name="isProtected">Whether the element is protected from edits.</param>
-        private static void ApplyBlendDataWeightToElement(SerializedProperty element, Func<float, float> weightFunc, bool isProtected)
+        /// <param name="isProtected">Whether the element is protected from weight edits.</param>
+        /// <param name="clearSplitLeftRight">Whether to clear the split-left-right flag.</param>
+        private static void ApplyBlendDataWeightToElement(
+            SerializedProperty element,
+            Func<float, float> weightFunc,
+            bool isProtected,
+            bool clearSplitLeftRight)
         {
             if (element == null)
-            {
-                return;
-            }
-
-            //SetProtectedFlag(element, isProtected);
-            if (isProtected)
             {
                 return;
             }
@@ -884,18 +903,27 @@ namespace Triturbo.FaceBlendShapeFix.Inspector
             SerializedProperty weightProp = element.FindPropertyRelative(nameof(BlendData.m_Weight));
             SerializedProperty leftProp = element.FindPropertyRelative(nameof(BlendData.m_LeftWeight));
             SerializedProperty rightProp = element.FindPropertyRelative(nameof(BlendData.m_RightWeight));
+            SerializedProperty splitProp = element.FindPropertyRelative(nameof(BlendData.m_SplitLeftRight));
 
-            if (weightProp != null)
+            if (!isProtected)
             {
-                weightProp.floatValue = weightFunc(weightProp.floatValue);
+                if (weightProp != null)
+                {
+                    weightProp.floatValue = weightFunc(weightProp.floatValue);
+                }
+                if (leftProp != null)
+                {
+                    leftProp.floatValue = weightFunc(leftProp.floatValue);
+                }
+                if (rightProp != null)
+                {
+                    rightProp.floatValue = weightFunc(rightProp.floatValue);
+                }
             }
-            if (leftProp != null)
+
+            if (clearSplitLeftRight && splitProp != null)
             {
-                leftProp.floatValue = weightFunc(leftProp.floatValue);
-            }
-            if (rightProp != null)
-            {
-                rightProp.floatValue = weightFunc(rightProp.floatValue);
+                splitProp.boolValue = false;
             }
         }
 
