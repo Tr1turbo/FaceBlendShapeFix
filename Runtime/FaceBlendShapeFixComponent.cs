@@ -15,6 +15,7 @@ namespace Triturbo.FaceBlendShapeFix.Runtime
     }
 
     [AddComponentMenu("Triturbo/Face BlendShape Fix")]
+    [DisallowMultipleComponent]
     public class FaceBlendShapeFixComponent : MonoBehaviour
 #if FBF_VRCSDK_BASE
     , IEditorOnly
